@@ -76,7 +76,7 @@ export default function Home() {
           <div className="space-y-6 text-lg">
             <p className="mt-0">Hello!</p>
             <p>
-              I'm a computer science student at the University of Michigan,
+              I&apos;m a computer science student at the University of Michigan,
               where I tutor undergraduates and conduct systems research in the{" "}
               <Link
                 href="https://orderlab.io/"
@@ -86,7 +86,7 @@ export default function Home() {
               >
                 Ordered Systems Lab
               </Link>
-              . I'm also a member of{" "}
+              . I&apos;m also a member of{" "}
               <Link
                 href="https://shiftcreator.space/"
                 className="text-blue-600 hover:underline"
@@ -99,7 +99,7 @@ export default function Home() {
               interdisciplinary projects.
             </p>
             <p>
-              Currently, I'm interning at{" "}
+              Currently, I&apos;m interning at{" "}
               <Link
                 href="https://www.apple.com/macos/macos-sequoia/"
                 className="text-blue-600 hover:underline"
