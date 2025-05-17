@@ -108,10 +108,9 @@ export default function Home() {
                 rel="noopener noreferrer"
               >
                 Apple
-              </Link>{" "}
-              in Cupertino, developing storage technologies for Core OS.
-              Previously, I worked on cloud infrastructure as a software
-              engineering intern at{" "}
+              </Link>
+              , developing storage technologies for Core OS. Previously, I
+              worked on cloud infrastructure as a software engineer intern at{" "}
               <Link
                 href="https://qumulo.com/"
                 className="text-blue-600 hover:underline"
@@ -119,7 +118,7 @@ export default function Home() {
                 rel="noopener noreferrer"
               >
                 Qumulo
-              </Link>{" "}
+              </Link>
               , a startup in Seattle.
             </p>
           </div>
