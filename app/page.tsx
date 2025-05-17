@@ -77,7 +77,8 @@ export default function Home() {
             <p className="mt-0">Hello!</p>
             <p>
               I&apos;m a computer science student at the University of Michigan,
-              where I tutor undergraduates and conduct systems research in the{" "}
+              where I work as a personal tutor and conduct operating systems
+              research in the{" "}
               <Link
                 href="https://orderlab.io/"
                 className="text-blue-600 hover:underline"
@@ -101,24 +102,25 @@ export default function Home() {
             <p>
               Currently, I&apos;m interning at{" "}
               <Link
-                href="https://www.apple.com/macos/macos-sequoia/"
+                href="https://www.apple.com/"
                 className="text-blue-600 hover:underline"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Apple CoreOS
+                Apple
               </Link>
-              , developing storage device drivers for macOS. Previously, I
-              worked on cloud infrastructure as a software engineering intern at{" "}
+              in Cupertino, developing storage technologies for Core OS.
+              Previously, I worked on cloud infrastructure as a software
+              engineering intern at{" "}
               <Link
-                href="https://qumulo.com/product/cloud/"
+                href="https://qumulo.com/"
                 className="text-blue-600 hover:underline"
                 target="_blank"
                 rel="noopener noreferrer"
               >
                 Qumulo
               </Link>
-              .
+              in Seattle.
             </p>
           </div>
         </FadeIn>
