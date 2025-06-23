@@ -77,8 +77,8 @@ export default function Home() {
             <p className="mt-0">Hello!</p>
             <p>
               I&apos;m a computer science student at the University of Michigan,
-              where I work as a personal tutor and conduct operating systems
-              research in the{" "}
+              where I serve as an Instructional Aide for EECS 482: Introduction
+              to Operating Systems and conduct systems research in the{" "}
               <Link
                 href="https://orderlab.io/"
                 className="text-blue-600 hover:underline"
@@ -87,7 +87,7 @@ export default function Home() {
               >
                 Ordered Systems Lab
               </Link>
-              . I&apos;m also a member of{" "}
+              , led by Professor Ryan Huang. I&apos;m also a member of{" "}
               <Link
                 href="https://shiftcreator.space/"
                 className="text-blue-600 hover:underline"
@@ -96,8 +96,8 @@ export default function Home() {
               >
                 Shift Creator Space
               </Link>
-              , a student community focused on building creative,
-              interdisciplinary projects.
+              , a student community focused on creative, interdisciplinary
+              projects.
             </p>
             <p>
               Currently, I&apos;m interning at{" "}
@@ -109,8 +109,9 @@ export default function Home() {
               >
                 Apple
               </Link>
-              , developing storage technologies for Core OS. Previously, I
-              worked on cloud infrastructure as a software engineer intern at{" "}
+              in Silicon Valley, developing storage technologies for Core OS.
+              Previously, I worked on cloud infrastructure as a software
+              engineering intern at{" "}
               <Link
                 href="https://qumulo.com/"
                 className="text-blue-600 hover:underline"
