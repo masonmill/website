@@ -109,9 +109,9 @@ export default function Home() {
               >
                 Apple
               </Link>{" "}
-              in Cupertino, developing storage technologies for Core OS.
-              Previously, I worked on file systems as a software engineering
-              intern at{" "}
+              in Cupertino, developing storage technologies for the CoreOS
+              organization. Previously, I worked on file systems as a software
+              engineering intern at{" "}
               <Link
                 href="https://qumulo.com/"
                 className="text-blue-600 hover:underline"
