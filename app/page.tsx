@@ -109,7 +109,7 @@ export default function Home() {
               >
                 Apple
               </Link>{" "}
-              in Silicon Valley, developing storage technologies for Core OS.
+              in Cupertino, developing storage technologies for Core OS.
               Previously, I worked on file systems as a software engineering
               intern at{" "}
               <Link
