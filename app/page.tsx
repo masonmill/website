@@ -77,9 +77,9 @@ export default function Home() {
             <p className="mt-0">Hello!</p>
             <p>
               I&apos;m a computer science student at the University of Michigan,
-              interested in operating systems research and development.
-              Currently, I work as an Instructional Assistant for EECS 482:
-              Intro to Operating Systems and conduct research in the{" "}
+              specializing in operating systems. I work as an Instructional
+              Assistant for EECS 482: Intro to Operating Systems and conduct
+              research in the{" "}
               <Link
                 href="https://orderlab.io/"
                 className="text-blue-600 hover:underline"
