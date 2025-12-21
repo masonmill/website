@@ -76,32 +76,33 @@ export default function Home() {
           <div className="space-y-6 text-lg">
             <p className="mt-0">Hello!</p>
             <p>
-              I&apos;m a computer science student at the University of Michigan,
-              specializing in operating systems. I work as an Instructional
-              Assistant for EECS 482: Intro to Operating Systems and conduct
-              research in the{" "}
+              I&apos;m a student at the University of Michigan studying Computer
+              Science. Currently, I work with Professor Brian Noble as an
+              Instructional Assistant for EECS 491: Intro to Distributed
+              Systems, and as a Research Assistant with the{" "}
               <Link
-                href="https://orderlab.io/"
+                href="https://www.orderlab.io/"
                 className="text-blue-600 hover:underline"
                 target="_blank"
                 rel="noopener noreferrer"
               >
                 Ordered Systems Lab
-              </Link>
-              , led by Professor Ryan Huang. I&apos;m also a member of{" "}
+              </Link>{" "}
+              led by Professor Ryan Huang.
+            </p>
+            <p>
+              Previously, I worked with Professor Peter Chen as an Instructional
+              Assistant for EECS 482: Intro to Operating Systems. I also have
+              Software Engineering experience at{" "}
               <Link
-                href="https://shiftcreator.space/"
+                href="https://www.qumulo.com/"
                 className="text-blue-600 hover:underline"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Shift Creator Space
+                Qumulo
               </Link>
-              , a student community focused on creative, interdisciplinary
-              projects.
-            </p>
-            <p>
-              Previously, I interned at{" "}
+              , a startup in Seattle, and{" "}
               <Link
                 href="https://www.apple.com/"
                 className="text-blue-600 hover:underline"
@@ -110,18 +111,17 @@ export default function Home() {
               >
                 Apple
               </Link>{" "}
-              in Cupertino, developing storage technologies for the Core OS
-              organization. I also worked on file systems as a software
-              engineering intern at{" "}
+              with their CoreOS organization in Cupertino. Next summer, I will
+              move to New York City to intern with{" "}
               <Link
-                href="https://qumulo.com/"
+                href="https://www.citadel.com/"
                 className="text-blue-600 hover:underline"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Qumulo
+                Citadel
               </Link>
-              , a startup in Seattle.
+              .
             </p>
           </div>
         </FadeIn>
