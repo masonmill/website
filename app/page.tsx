@@ -81,7 +81,7 @@ export default function Home() {
               Instructional Assistant for EECS 491: Intro to Distributed
               Systems, and as a Research Assistant with the{" "}
               <Link
-                href="https://www.orderlab.io/"
+                href="https://orderlab.io/"
                 className="text-blue-600 hover:underline"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -95,7 +95,7 @@ export default function Home() {
               Assistant for EECS 482: Intro to Operating Systems. I also have
               Software Engineering experience at{" "}
               <Link
-                href="https://www.qumulo.com/"
+                href="https://qumulo.com/"
                 className="text-blue-600 hover:underline"
                 target="_blank"
                 rel="noopener noreferrer"
