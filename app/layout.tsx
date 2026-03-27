@@ -10,7 +10,7 @@ const geist = Geist({
 export const metadata: Metadata = {
   title: "Mason Miller",
   description:
-    "Personal website of Mason Miller, a systems-focused CS student at the University of Michigan and Apple intern.",
+    "CS student at the University of Michigan interested in systems and high-performance I/O.",
 };
 
 export default function RootLayout({
