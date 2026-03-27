@@ -1,11 +1,14 @@
 "use client";
 
 import { motion } from "motion/react";
+import { useState } from "react";
 import { FileText, Mail } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
 export default function Home() {
+  const [climbHovered, setClimbHovered] = useState(false);
+
   return (
     <main className="flex items-center justify-center min-h-screen px-4 py-6 pb-32">
 <motion.div
@@ -74,6 +77,26 @@ export default function Home() {
           </motion.div>
         </div>
       </motion.div>
+
+      <Link href="/climbing" aria-label="Climbing log" className="fixed bottom-6 right-6">
+        <motion.span
+          className="text-3xl cursor-pointer select-none block"
+          initial={{ opacity: 0.15 }}
+          animate={{
+            opacity: climbHovered ? 1 : 0.15,
+            y: climbHovered ? [0, -8, 0] : 0,
+          }}
+          transition={
+            climbHovered
+              ? { opacity: { duration: 0.15 }, y: { duration: 0.6, repeat: Infinity, ease: "easeInOut" } }
+              : { opacity: { duration: 0.3 }, y: { duration: 0.2 } }
+          }
+          onHoverStart={() => setClimbHovered(true)}
+          onHoverEnd={() => setClimbHovered(false)}
+        >
+          🧗
+        </motion.span>
+      </Link>
     </main>
   );
 }
