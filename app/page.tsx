@@ -1,134 +1,106 @@
 "use client";
 
-import {
-  motion,
-  useScroll,
-  useTransform,
-  useMotionValueEvent,
-} from "motion/react";
+import { motion } from "motion/react";
+import { useState } from "react";
+import { FileText, Mail } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 export default function Home() {
-  const { scrollYProgress } = useScroll();
-  const background = useTransform(
-    scrollYProgress,
-    [0, 1],
-    ["#ffffff", "#f0f4ff"]
-  );
-
-  useMotionValueEvent(background, "change", (val) => {
-    document.body.style.background = val;
-  });
+  const [climbHovered, setClimbHovered] = useState(false);
 
   return (
-    <main className="flex flex-col px-8 pt-24 pb-12 space-y-10 min-h-screen relative">
-      <motion.div className="w-full max-w-3xl mx-auto">
-        <motion.div
-          className="flex justify-between items-center flex-wrap gap-y-2"
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
-          <h1 className="text-3xl font-bold tracking-tight">Mason Miller</h1>
-          <div className="flex flex-wrap justify-end gap-4 text-lg text-gray-700">
-            <Link
-              href="mailto:masonmil@umich.edu"
-              className="hover:text-blue-600 hover:underline"
-            >
-              Email
-            </Link>
-            <Link
-              href="https://github.com/masonmill"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-blue-600 hover:underline"
-            >
-              GitHub
-            </Link>
-            <Link
-              href="https://linkedin.com/in/masonmil"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-blue-600 hover:underline"
-            >
-              LinkedIn
-            </Link>
-            <Link
-              href="/resume.pdf"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-blue-600 hover:underline"
-            >
-              Resume
-            </Link>
+    <main className="flex items-center justify-center min-h-screen px-4 py-6 pb-32">
+<motion.div
+        className="flex gap-5 items-start max-w-2xl w-full"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+      >
+        {/* Left column: photo */}
+        <div className="shrink-0">
+          <Image
+            src="/headshot.jpg"
+            alt="Mason Miller"
+            width={112}
+            height={112}
+            className="rounded-full object-cover"
+            priority
+          />
+        </div>
+
+        {/* Right column: name + icons + bio */}
+        <div className="flex flex-col gap-4 pt-1">
+          <div className="flex items-center justify-between gap-4">
+            <h1 className="text-4xl font-bold tracking-tight">Mason Miller</h1>
+            <div className="icon-links flex items-center gap-4 text-gray-500">
+              <Link href="mailto:masonmil@umich.edu" aria-label="Email" className="hover:text-blue-600">
+                <Mail size={22} />
+              </Link>
+              <Link href="https://github.com/masonmill" target="_blank" rel="noopener noreferrer" aria-label="GitHub" className="opacity-60 hover:opacity-100">
+                <Image src="/github.svg" alt="GitHub" width={22} height={22} className="svg-icon" />
+              </Link>
+              <Link href="https://linkedin.com/in/masonmil" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" className="opacity-60 hover:opacity-100">
+                <Image src="/linkedin.svg" alt="LinkedIn" width={22} height={22} className="svg-icon" />
+              </Link>
+              <Link href="/resume.pdf" target="_blank" rel="noopener noreferrer" aria-label="Resume" className="hover:text-blue-600">
+                <FileText size={22} />
+              </Link>
+            </div>
           </div>
-        </motion.div>
+          <motion.div
+            className="text-xl leading-relaxed flex flex-col gap-3"
+            initial="hidden"
+            animate="visible"
+            transition={{ staggerChildren: 0.2 }}
+          >
+            <FadeIn>
+              <p>I&apos;m a CS student at the University of Michigan, focused on software systems.</p>
+            </FadeIn>
+            <FadeIn>
+              <p>I&apos;m interested in storage systems, high-performance I/O, and distributed systems — primarily in C and C++.</p>
+            </FadeIn>
+            <FadeIn>
+              <p>
+                This summer, I&apos;m joining{" "}
+                <Link
+                  href="https://www.citadel.com/"
+                  className="brand-link text-blue-600 hover:underline"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Citadel
+                </Link>
+                {" "}in New York.
+              </p>
+            </FadeIn>
+          </motion.div>
+        </div>
       </motion.div>
 
-      <motion.section
-        className="w-full max-w-3xl text-left mx-auto"
-        initial="hidden"
-        whileInView="visible"
-        viewport={{ once: true }}
-        transition={{ staggerChildren: 0.2 }}
-      >
-        <FadeIn>
-          <div className="space-y-6 text-lg">
-            <p className="mt-0">Hello!</p>
-            <p>
-              I&apos;m a student at the University of Michigan studying Computer
-              Science. Currently, I work with Professor Brian Noble as an
-              Instructional Assistant for EECS 491: Intro to Distributed
-              Systems, and as a Research Assistant with the{" "}
-              <Link
-                href="https://orderlab.io/"
-                className="text-blue-600 hover:underline"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Ordered Systems Lab
-              </Link>{" "}
-              led by Professor Ryan Huang.
-            </p>
-            <p>
-              Previously, I worked with Professor Peter Chen as an Instructional
-              Assistant for EECS 482: Intro to Operating Systems. I also have
-              Software Engineering experience at{" "}
-              <Link
-                href="https://qumulo.com/"
-                className="text-blue-600 hover:underline"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Qumulo
-              </Link>
-              , a startup in Seattle, and{" "}
-              <Link
-                href="https://www.apple.com/"
-                className="text-blue-600 hover:underline"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Apple
-              </Link>{" "}
-              with their CoreOS organization in Cupertino. Next summer, I will
-              move to New York City to intern with{" "}
-              <Link
-                href="https://www.citadel.com/"
-                className="text-blue-600 hover:underline"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Citadel
-              </Link>
-              .
-            </p>
-          </div>
-        </FadeIn>
-      </motion.section>
+      <Link href="/climbing" aria-label="Climbing log" className="fixed bottom-6 right-6">
+        <motion.span
+          className="text-3xl cursor-pointer select-none block"
+          initial={{ opacity: 0.15 }}
+          animate={{
+            opacity: climbHovered ? 1 : 0.15,
+            y: climbHovered ? [0, -8, 0] : 0,
+          }}
+          transition={
+            climbHovered
+              ? { opacity: { duration: 0.15 }, y: { duration: 0.6, repeat: Infinity, ease: "easeInOut" } }
+              : { opacity: { duration: 0.3 }, y: { duration: 0.2 } }
+          }
+          onHoverStart={() => setClimbHovered(true)}
+          onHoverEnd={() => setClimbHovered(false)}
+        >
+          🧗
+        </motion.span>
+      </Link>
     </main>
   );
 }
+
 
 function FadeIn({ children }: { children: React.ReactNode }) {
   return (
