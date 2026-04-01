@@ -84,7 +84,7 @@ export default function ClimbingLogView({ entries }: { entries: LogEntry[] | nul
           <Link href="/" className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 transition-colors">
             ← back
           </Link>
-          <h1 className="text-3xl font-bold tracking-tight mt-3">Climbing Log</h1>
+          <h1 className="text-4xl font-bold tracking-tight mt-3">Climbing Log</h1>
           {entries === null ? (
             <p className="text-gray-400 mt-1 text-sm">Unavailable right now.</p>
           ) : (
@@ -108,8 +108,8 @@ export default function ClimbingLogView({ entries }: { entries: LogEntry[] | nul
                       className={`flex items-start justify-between gap-4 px-4 py-4 ${i < dayEntries.length - 1 ? "border-b border-gray-100" : ""}`}
                     >
                       <div className="flex flex-col gap-1.5">
-                        <span className="font-medium">{entry.name}</span>
-                        <div className="flex items-center gap-2 flex-wrap text-sm text-gray-500">
+                        <span className="text-lg font-medium">{entry.name}</span>
+                        <div className="flex items-center gap-2 flex-wrap text-base text-gray-500">
                           <span
                             className={`text-xs font-medium px-2 py-0.5 rounded-full ${GRADE_COLORS[entry.grade] ?? "text-gray-600 bg-gray-100"}`}
                           >
@@ -124,7 +124,7 @@ export default function ClimbingLogView({ entries }: { entries: LogEntry[] | nul
                       </div>
 
                       <div className="flex flex-col items-end gap-1 shrink-0 pt-0.5">
-                        <span className={`text-sm font-medium ${entry.sent ? "text-green-600" : "text-gray-400"}`}>
+                        <span className={`text-base font-medium ${entry.sent ? "text-green-600" : "text-gray-400"}`}>
                           {entry.sent ? "Sent" : "Project"}
                         </span>
                       </div>

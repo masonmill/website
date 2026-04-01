@@ -32,7 +32,7 @@ export default function Home() {
         {/* Right column: name + icons + bio */}
         <div className="flex flex-col gap-4 pt-1">
           <div className="flex items-center justify-between gap-4">
-            <h1 className="text-4xl font-bold tracking-tight">Mason Miller</h1>
+            <h1 className="text-5xl font-bold tracking-tight">Mason Miller</h1>
             <div className="icon-links flex items-center gap-4 text-gray-500">
               <Link href="mailto:masonmil@umich.edu" aria-label="Email" className="hover:text-blue-600">
                 <Mail size={22} />
@@ -49,7 +49,7 @@ export default function Home() {
             </div>
           </div>
           <motion.div
-            className="text-xl leading-relaxed flex flex-col gap-3"
+            className="text-2xl leading-relaxed flex flex-col gap-3"
             initial="hidden"
             animate="visible"
             transition={{ staggerChildren: 0.2 }}
