@@ -5,12 +5,30 @@ import Link from "next/link";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface LogEntry {
+export interface LogSession {
+  id: number;
+  timestamp: number;
+  attempts: number;
+  incline: number;
+  sent: boolean;
+}
+
+export interface LogClimb {
   id: number;
   name: string;
-  timestamp: number;
   board: string;
   grade: string;
+  sessions: LogSession[];
+}
+
+// Flattened for display: one row per session, with climb info attached.
+interface SessionRow {
+  climbId: number;
+  sessionId: number;
+  name: string;
+  board: string;
+  grade: string;
+  timestamp: number;
   attempts: number;
   incline: number;
   sent: boolean;
@@ -52,6 +70,22 @@ const fadeUp = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+function flattenClimbs(climbs: LogClimb[]): SessionRow[] {
+  return climbs.flatMap((climb) =>
+    climb.sessions.map((session) => ({
+      climbId: climb.id,
+      sessionId: session.id,
+      name: climb.name,
+      board: climb.board,
+      grade: climb.grade,
+      timestamp: session.timestamp,
+      attempts: session.attempts,
+      incline: session.incline,
+      sent: session.sent,
+    }))
+  );
+}
+
 function dateKey(timestamp: number): string {
   return new Date(timestamp * 1000).toLocaleDateString("en-US", {
     month: "short",
@@ -60,21 +94,26 @@ function dateKey(timestamp: number): string {
   });
 }
 
-function groupByDate(entries: LogEntry[]): [string, LogEntry[]][] {
-  const map = new Map<string, LogEntry[]>();
-  for (const entry of entries) {
-    const key = dateKey(entry.timestamp);
+function groupByDate(rows: SessionRow[]): [string, SessionRow[]][] {
+  const map = new Map<string, SessionRow[]>();
+  for (const row of rows) {
+    const key = dateKey(row.timestamp);
     const group = map.get(key);
-    if (group) group.push(entry);
-    else map.set(key, [entry]);
+    if (group) group.push(row);
+    else map.set(key, [row]);
   }
   return Array.from(map.entries());
 }
 
+function totalSessions(climbs: LogClimb[]): number {
+  return climbs.reduce((sum, c) => sum + c.sessions.length, 0);
+}
+
 // ─── View ─────────────────────────────────────────────────────────────────────
 
-export default function ClimbingLogView({ entries }: { entries: LogEntry[] | null }) {
-  const groups = entries ? groupByDate(entries) : [];
+export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null }) {
+  const rows = climbs ? flattenClimbs(climbs).sort((a, b) => b.timestamp - a.timestamp) : [];
+  const groups = climbs ? groupByDate(rows) : [];
 
   return (
     <main className="flex justify-center min-h-screen px-4 py-12">
@@ -85,47 +124,47 @@ export default function ClimbingLogView({ entries }: { entries: LogEntry[] | nul
             ← back
           </Link>
           <h1 className="text-4xl font-bold tracking-tight mt-3">Climbing Log</h1>
-          {entries === null ? (
+          {climbs === null ? (
             <p className="text-gray-400 mt-1 text-sm">Unavailable right now.</p>
           ) : (
             <p className="text-gray-500 mt-1 text-sm">
-              {entries.length} problem{entries.length !== 1 ? "s" : ""}
+              {climbs.length} problem{climbs.length !== 1 ? "s" : ""} · {totalSessions(climbs)} session{totalSessions(climbs) !== 1 ? "s" : ""}
             </p>
           )}
         </motion.div>
 
-        {entries !== null && (
+        {climbs !== null && (
           <motion.div className="flex flex-col gap-8" {...staggerList}>
-            {groups.map(([date, dayEntries]) => (
+            {groups.map(([date, dayRows]) => (
               <motion.div key={date} {...fadeUp}>
                 <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">
                   {date}
                 </p>
                 <div className="flex flex-col rounded-xl border border-gray-100 overflow-hidden">
-                  {dayEntries.map((entry, i) => (
+                  {dayRows.map((row, i) => (
                     <div
-                      key={entry.id}
-                      className={`flex items-start justify-between gap-4 px-4 py-4 ${i < dayEntries.length - 1 ? "border-b border-gray-100" : ""}`}
+                      key={`${row.climbId}-${row.sessionId}`}
+                      className={`flex items-start justify-between gap-4 px-4 py-4 ${i < dayRows.length - 1 ? "border-b border-gray-100" : ""}`}
                     >
                       <div className="flex flex-col gap-1.5">
-                        <span className="text-lg font-medium">{entry.name}</span>
+                        <span className="text-lg font-medium">{row.name}</span>
                         <div className="flex items-center gap-2 flex-wrap text-base text-gray-500">
                           <span
-                            className={`text-xs font-medium px-2 py-0.5 rounded-full ${GRADE_COLORS[entry.grade] ?? "text-gray-600 bg-gray-100"}`}
+                            className={`text-xs font-medium px-2 py-0.5 rounded-full ${GRADE_COLORS[row.grade] ?? "text-gray-600 bg-gray-100"}`}
                           >
-                            {entry.grade}
+                            {row.grade}
                           </span>
-                          <span>{entry.board}</span>
+                          <span>{row.board}</span>
                           <span className="text-gray-300">·</span>
-                          <span>{entry.incline}°</span>
+                          <span>{row.incline}°</span>
                           <span className="text-gray-300">·</span>
-                          <span>{entry.attempts} attempt{entry.attempts !== 1 ? "s" : ""}</span>
+                          <span>{row.attempts} attempt{row.attempts !== 1 ? "s" : ""}</span>
                         </div>
                       </div>
 
                       <div className="flex flex-col items-end gap-1 shrink-0 pt-0.5">
-                        <span className={`text-base font-medium ${entry.sent ? "text-green-600" : "text-gray-400"}`}>
-                          {entry.sent ? "Sent" : "Project"}
+                        <span className={`text-base font-medium ${row.sent ? "text-green-600" : "text-gray-400"}`}>
+                          {row.sent ? "Sent" : "Project"}
                         </span>
                       </div>
                     </div>
