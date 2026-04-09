@@ -14,7 +14,7 @@ interface LogData {
 
 async function getLog(): Promise<LogData> {
   const res = await fetch(
-    "https://raw.githubusercontent.com/masonmill/climbinglog/refactor/data/log.json",
+    "https://raw.githubusercontent.com/masonmill/climbinglog/main/data/log.json",
     { next: { revalidate: 3600 } }
   );
   if (!res.ok) throw new Error(`Failed to fetch climbing log: ${res.status}`);
