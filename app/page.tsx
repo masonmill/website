@@ -10,14 +10,14 @@ export default function Home() {
   const [climbHovered, setClimbHovered] = useState(false);
 
   return (
-    <main className="flex items-center justify-center min-h-screen px-4 py-6 pb-32">
-<motion.div
-        className="flex gap-5 items-start max-w-2xl w-full"
+    <main className="flex items-center justify-center min-h-screen px-4 py-8 pb-24 sm:py-6 sm:pb-32">
+      <motion.div
+        className="flex flex-col sm:flex-row gap-5 items-center sm:items-start max-w-2xl w-full"
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
       >
-        {/* Left column: photo */}
+        {/* Photo */}
         <div className="shrink-0">
           <Image
             src="/headshot.jpg"
@@ -29,10 +29,10 @@ export default function Home() {
           />
         </div>
 
-        {/* Right column: name + icons + bio */}
-        <div className="flex flex-col gap-4 pt-1">
-          <div className="flex items-center justify-between gap-4">
-            <h1 className="text-5xl font-bold tracking-tight">Mason Miller</h1>
+        {/* Name + icons + bio */}
+        <div className="flex flex-col gap-4 pt-1 items-center sm:items-start text-center sm:text-left">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 w-full">
+            <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">Mason Miller</h1>
             <div className="icon-links flex items-center gap-4 text-gray-500">
               <Link href="mailto:masonmil@umich.edu" aria-label="Email" className="hover:text-blue-600">
                 <Mail size={22} />
@@ -49,7 +49,7 @@ export default function Home() {
             </div>
           </div>
           <motion.div
-            className="text-2xl leading-relaxed flex flex-col gap-3"
+            className="text-xl sm:text-2xl leading-relaxed flex flex-col gap-3"
             initial="hidden"
             animate="visible"
             transition={{ staggerChildren: 0.2 }}
