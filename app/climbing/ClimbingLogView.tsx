@@ -35,6 +35,7 @@ interface SessionRow {
   attempts: number;
   incline: number;
   sent: boolean;
+  label: SendLabel;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -58,6 +59,7 @@ const GRADE_COLORS_DARK: Record<string, string> = {
 };
 
 type StatusFilter = "all" | "sent" | "project";
+type SendLabel = "Flash" | "Day flash" | "Repeat" | "Sent" | "Project";
 
 // ─── Animation variants ───────────────────────────────────────────────────────
 
@@ -153,12 +155,12 @@ function computeStats(climbs: LogClimb[]) {
   );
 
   // Weekly activity heatmap
-  const weekData = new Map<number, { sessions: number; attempts: number; sends: number }>();
+  const weekData = new Map<number, { days: Set<string>; attempts: number; sends: number }>();
   for (const c of climbs) {
     for (const s of c.sessions) {
       const monday = mondayOfWeek(s.timestamp);
-      const entry = weekData.get(monday) ?? { sessions: 0, attempts: 0, sends: 0 };
-      entry.sessions++;
+      const entry = weekData.get(monday) ?? { days: new Set(), attempts: 0, sends: 0 };
+      entry.days.add(dateKey(s.timestamp));
       entry.attempts += s.attempts;
       if (s.sent) entry.sends++;
       weekData.set(monday, entry);
@@ -174,7 +176,7 @@ function computeStats(climbs: LogClimb[]) {
       const d = weekData.get(m);
       weeklyActivity.push({
         weekStart: m,
-        sessions: d?.sessions ?? 0,
+        sessions: d?.days.size ?? 0,
         attempts: d?.attempts ?? 0,
         sends: d?.sends ?? 0,
       });
@@ -202,7 +204,7 @@ function computeStats(climbs: LogClimb[]) {
 
 function StatCard({ value, label }: { value: string; label: string }) {
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col rounded-lg bg-gray-50 dark:bg-gray-800/50 px-3.5 py-3">
       <span className="text-2xl font-bold tracking-tight">{value}</span>
       <span className="text-xs text-gray-500 dark:text-gray-400">{label}</span>
     </div>
@@ -213,11 +215,19 @@ function WeeklyHeatmap({ weeks }: { weeks: WeekBucket[] }) {
   const [hovered, setHovered] = useState<number | null>(null);
 
   if (weeks.length === 0) return null;
-  const maxSessions = Math.max(...weeks.map((w) => w.sessions));
 
-  function intensity(count: number): string {
-    if (count === 0) return "bg-gray-100 dark:bg-gray-800";
-    const ratio = count / maxSessions;
+  // Activity score: attempts are the primary driver of volume; gym days add a
+  // small bonus so a day with many short sessions still registers higher than
+  // a single casual visit with the same attempt count.
+  function activityScore(w: WeekBucket): number {
+    return w.attempts + w.sessions * 3;
+  }
+  const maxScore = Math.max(...weeks.map(activityScore));
+
+  function intensity(w: WeekBucket): string {
+    const score = activityScore(w);
+    if (score === 0) return "bg-gray-100 dark:bg-gray-800";
+    const ratio = score / maxScore;
     if (ratio <= 0.33) return "bg-green-200 dark:bg-green-900";
     if (ratio <= 0.66) return "bg-green-400 dark:bg-green-700";
     return "bg-green-600 dark:bg-green-500";
@@ -242,7 +252,7 @@ function WeeklyHeatmap({ weeks }: { weeks: WeekBucket[] }) {
         {weeks.map((w) => (
           <div
             key={w.weekStart}
-            className={`w-4 h-4 rounded-sm ${intensity(w.sessions)} transition-colors cursor-default`}
+            className={`w-4 h-4 rounded-sm ${intensity(w)} transition-colors cursor-default`}
             onMouseEnter={() => setHovered(w.weekStart)}
             onMouseLeave={() => setHovered(null)}
           />
@@ -357,19 +367,35 @@ function StatsPanel({ stats }: { stats: ReturnType<typeof computeStats> }) {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function flattenClimbs(climbs: LogClimb[]): SessionRow[] {
-  return climbs.flatMap((climb) =>
-    climb.sessions.map((session) => ({
-      climbId: climb.id,
-      sessionId: session.id,
-      name: climb.name,
-      board: climb.board,
-      grade: climb.grade,
-      timestamp: session.timestamp,
-      attempts: session.attempts,
-      incline: session.incline,
-      sent: session.sent,
-    }))
-  );
+  return climbs.flatMap((climb) => {
+    // Sort once per climb so sendLabel doesn't re-sort per row.
+    const sorted = [...climb.sessions].sort((a, b) => a.timestamp - b.timestamp);
+    return climb.sessions.map((session) => {
+      const idx = sorted.findIndex((s) => s.id === session.id);
+      const label = computeLabel(session, idx, sorted);
+      return {
+        climbId: climb.id,
+        sessionId: session.id,
+        name: climb.name,
+        board: climb.board,
+        grade: climb.grade,
+        timestamp: session.timestamp,
+        attempts: session.attempts,
+        incline: session.incline,
+        sent: session.sent,
+        label,
+      };
+    });
+  });
+}
+
+function computeLabel(session: LogSession, idx: number, sortedSessions: LogSession[]): SendLabel {
+  if (!session.sent) return "Project";
+  const previouslySent = sortedSessions.slice(0, idx).some((s) => s.sent);
+  if (previouslySent) return "Repeat";
+  if (session.attempts === 1 && idx === 0) return "Flash";
+  if (session.attempts === 1) return "Day flash";
+  return "Sent";
 }
 
 function dateKey(timestamp: number): string {
@@ -399,20 +425,10 @@ function groupByDate(rows: SessionRow[]): [string, SessionRow[]][] {
 }
 
 function totalSessions(climbs: LogClimb[]): number {
-  return climbs.reduce((sum, c) => sum + c.sessions.length, 0);
-}
-
-type SendLabel = "Flash" | "Day flash" | "Repeat" | "Sent" | "Project";
-
-function sendLabel(climb: LogClimb, session: LogSession): SendLabel {
-  if (!session.sent) return "Project";
-  const sorted = [...climb.sessions].sort((a, b) => a.timestamp - b.timestamp);
-  const idx = sorted.findIndex((s) => s.id === session.id);
-  const previouslySent = sorted.slice(0, idx).some((s) => s.sent);
-  if (previouslySent) return "Repeat";
-  if (session.attempts === 1 && idx === 0) return "Flash";
-  if (session.attempts === 1) return "Day flash";
-  return "Sent";
+  const daySet = new Set(
+    climbs.flatMap((c) => c.sessions.map((s) => dateKey(s.timestamp)))
+  );
+  return daySet.size;
 }
 
 const LABEL_COLORS: Record<SendLabel, string> = {
@@ -420,7 +436,7 @@ const LABEL_COLORS: Record<SendLabel, string> = {
   "Day flash": "text-green-600 dark:text-green-400",
   "Repeat":    "text-blue-600 dark:text-blue-400",
   "Sent":      "text-green-600 dark:text-green-400",
-  "Project":   "text-gray-400 dark:text-gray-500",
+  "Project":   "text-gray-300 dark:text-gray-600",
 };
 
 // ─── Filter Bar ───────────────────────────────────────────────────────────────
@@ -439,48 +455,50 @@ function FilterBar({
   onStatusChange: (s: StatusFilter) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 flex-1">
+    <div className="flex flex-col gap-2 flex-1">
       {/* Grade pills */}
-      <button
-        onClick={() => onGradeChange("all")}
-        className={`text-xs font-medium px-2.5 py-1 rounded-full transition-colors ${
-          selectedGrade === "all"
-            ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
-            : "bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-        }`}
-      >
-        All grades
-      </button>
-      {grades.map((grade) => (
+      <div className="flex flex-wrap gap-2">
         <button
-          key={grade}
-          onClick={() => onGradeChange(grade === selectedGrade ? "all" : grade)}
+          onClick={() => onGradeChange("all")}
           className={`text-xs font-medium px-2.5 py-1 rounded-full transition-colors ${
-            grade === selectedGrade
-              ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
-              : `${GRADE_COLORS[grade]} ${GRADE_COLORS_DARK[grade]}`
-          }`}
-        >
-          {grade}
-        </button>
-      ))}
-
-      <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1 hidden sm:block" />
-
-      {/* Status pills */}
-      {(["all", "sent", "project"] as const).map((s) => (
-        <button
-          key={s}
-          onClick={() => onStatusChange(s)}
-          className={`text-xs font-medium px-2.5 py-1 rounded-full transition-colors capitalize ${
-            status === s
+            selectedGrade === "all"
               ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
               : "bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
           }`}
         >
-          {s === "all" ? "All status" : s === "sent" ? "Sent" : "Project"}
+          All Grades
         </button>
-      ))}
+        {grades.map((grade) => (
+          <button
+            key={grade}
+            onClick={() => onGradeChange(grade === selectedGrade ? "all" : grade)}
+            className={`text-xs font-medium px-2.5 py-1 rounded-full transition-colors ${
+              grade === selectedGrade
+                ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
+                : `${GRADE_COLORS[grade]} ${GRADE_COLORS_DARK[grade]}`
+            }`}
+          >
+            {grade}
+          </button>
+        ))}
+      </div>
+
+      {/* Status pills */}
+      <div className="flex flex-wrap gap-2">
+        {(["all", "sent", "project"] as const).map((s) => (
+          <button
+            key={s}
+            onClick={() => onStatusChange(s)}
+            className={`text-xs font-medium px-2.5 py-1 rounded-full transition-colors capitalize ${
+              status === s
+                ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
+                : "bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+            }`}
+          >
+            {s === "all" ? "All Status" : s === "sent" ? "Sent" : "Project"}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -488,7 +506,9 @@ function FilterBar({
 // ─── Expanded Climb Detail ────────────────────────────────────────────────────
 
 function ClimbHistory({ climb, activeSessionId }: { climb: LogClimb; activeSessionId: number }) {
-  const sorted = [...climb.sessions].sort((a, b) => b.timestamp - a.timestamp);
+  // Sort chronologically once for label computation, then reverse for display.
+  const chronological = [...climb.sessions].sort((a, b) => a.timestamp - b.timestamp);
+  const sorted = [...chronological].reverse();
   const totalAttempts = sorted.reduce((sum, s) => sum + s.attempts, 0);
   const everSent = sorted.some((s) => s.sent);
 
@@ -517,7 +537,8 @@ function ClimbHistory({ climb, activeSessionId }: { climb: LogClimb; activeSessi
           <div className="flex flex-col gap-1">
             {sorted.map((session) => {
               const isActive = session.id === activeSessionId;
-              const label = sendLabel(climb, session);
+              const idx = chronological.findIndex((s) => s.id === session.id);
+              const label = computeLabel(session, idx, chronological);
               return (
                 <div
                   key={session.id}
@@ -573,10 +594,15 @@ export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null 
     return GRADES.filter((g) => gradeSet.has(g));
   }, [climbs]);
 
-  // Apply filters
-  const filtered = useMemo(() => {
+  // Flatten + sort once when climbs change (not on every filter toggle).
+  const allRows = useMemo(() => {
     if (!climbs) return [];
-    let rows = flattenClimbs(climbs).sort((a, b) => b.timestamp - a.timestamp);
+    return flattenClimbs(climbs).sort((a, b) => b.timestamp - a.timestamp);
+  }, [climbs]);
+
+  // Apply filters (cheap subset of the pre-sorted array).
+  const filtered = useMemo(() => {
+    let rows = allRows;
     if (gradeFilter !== "all") {
       rows = rows.filter((r) => r.grade === gradeFilter);
     }
@@ -586,7 +612,7 @@ export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null 
       rows = rows.filter((r) => !r.sent);
     }
     return rows;
-  }, [climbs, gradeFilter, statusFilter]);
+  }, [allRows, gradeFilter, statusFilter]);
 
   const groups = useMemo(() => groupByDate(filtered), [filtered]);
 
@@ -612,7 +638,7 @@ export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null 
               <p className="text-gray-400 mt-1 text-sm">Unavailable right now.</p>
             ) : (
               <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">
-                {climbs.length} problem{climbs.length !== 1 ? "s" : ""} · {totalSessions(climbs)} session{totalSessions(climbs) !== 1 ? "s" : ""}
+                {(() => { const s = totalSessions(climbs); return <>{climbs.length} problem{climbs.length !== 1 ? "s" : ""} · {s} session{s !== 1 ? "s" : ""}</>; })()}
               </p>
             )}
           </div>
@@ -703,14 +729,9 @@ export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null 
                               </div>
 
                               <div className="flex flex-col items-end gap-1 shrink-0 pt-0.5">
-                                {(() => {
-                                  const label = climb ? sendLabel(climb, { id: row.sessionId, timestamp: row.timestamp, attempts: row.attempts, incline: row.incline, sent: row.sent }) : (row.sent ? "Sent" : "Project") as SendLabel;
-                                  return (
-                                    <span className={`text-sm sm:text-base font-medium ${LABEL_COLORS[label]}`}>
-                                      {label}
-                                    </span>
-                                  );
-                                })()}
+                                <span className={`text-sm sm:text-base font-medium ${LABEL_COLORS[row.label]}`}>
+                                  {row.label === "Project" ? "—" : row.label}
+                                </span>
                               </div>
                             </div>
 
