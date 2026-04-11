@@ -153,12 +153,12 @@ function computeStats(climbs: LogClimb[]) {
   );
 
   // Weekly activity heatmap
-  const weekData = new Map<number, { sessions: number; attempts: number; sends: number }>();
+  const weekData = new Map<number, { days: Set<string>; attempts: number; sends: number }>();
   for (const c of climbs) {
     for (const s of c.sessions) {
       const monday = mondayOfWeek(s.timestamp);
-      const entry = weekData.get(monday) ?? { sessions: 0, attempts: 0, sends: 0 };
-      entry.sessions++;
+      const entry = weekData.get(monday) ?? { days: new Set(), attempts: 0, sends: 0 };
+      entry.days.add(dateKey(s.timestamp));
       entry.attempts += s.attempts;
       if (s.sent) entry.sends++;
       weekData.set(monday, entry);
@@ -174,7 +174,7 @@ function computeStats(climbs: LogClimb[]) {
       const d = weekData.get(m);
       weeklyActivity.push({
         weekStart: m,
-        sessions: d?.sessions ?? 0,
+        sessions: d?.days.size ?? 0,
         attempts: d?.attempts ?? 0,
         sends: d?.sends ?? 0,
       });
@@ -213,11 +213,19 @@ function WeeklyHeatmap({ weeks }: { weeks: WeekBucket[] }) {
   const [hovered, setHovered] = useState<number | null>(null);
 
   if (weeks.length === 0) return null;
-  const maxSessions = Math.max(...weeks.map((w) => w.sessions));
 
-  function intensity(count: number): string {
-    if (count === 0) return "bg-gray-100 dark:bg-gray-800";
-    const ratio = count / maxSessions;
+  // Activity score: attempts are the primary driver of volume; gym days add a
+  // small bonus so a day with many short sessions still registers higher than
+  // a single casual visit with the same attempt count.
+  function activityScore(w: WeekBucket): number {
+    return w.attempts + w.sessions * 3;
+  }
+  const maxScore = Math.max(...weeks.map(activityScore));
+
+  function intensity(w: WeekBucket): string {
+    const score = activityScore(w);
+    if (score === 0) return "bg-gray-100 dark:bg-gray-800";
+    const ratio = score / maxScore;
     if (ratio <= 0.33) return "bg-green-200 dark:bg-green-900";
     if (ratio <= 0.66) return "bg-green-400 dark:bg-green-700";
     return "bg-green-600 dark:bg-green-500";
@@ -242,7 +250,7 @@ function WeeklyHeatmap({ weeks }: { weeks: WeekBucket[] }) {
         {weeks.map((w) => (
           <div
             key={w.weekStart}
-            className={`w-4 h-4 rounded-sm ${intensity(w.sessions)} transition-colors cursor-default`}
+            className={`w-4 h-4 rounded-sm ${intensity(w)} transition-colors cursor-default`}
             onMouseEnter={() => setHovered(w.weekStart)}
             onMouseLeave={() => setHovered(null)}
           />
@@ -399,7 +407,10 @@ function groupByDate(rows: SessionRow[]): [string, SessionRow[]][] {
 }
 
 function totalSessions(climbs: LogClimb[]): number {
-  return climbs.reduce((sum, c) => sum + c.sessions.length, 0);
+  const daySet = new Set(
+    climbs.flatMap((c) => c.sessions.map((s) => dateKey(s.timestamp)))
+  );
+  return daySet.size;
 }
 
 type SendLabel = "Flash" | "Day flash" | "Repeat" | "Sent" | "Project";
@@ -439,48 +450,50 @@ function FilterBar({
   onStatusChange: (s: StatusFilter) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 flex-1">
+    <div className="flex flex-col gap-2 flex-1">
       {/* Grade pills */}
-      <button
-        onClick={() => onGradeChange("all")}
-        className={`text-xs font-medium px-2.5 py-1 rounded-full transition-colors ${
-          selectedGrade === "all"
-            ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
-            : "bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-        }`}
-      >
-        All grades
-      </button>
-      {grades.map((grade) => (
+      <div className="flex flex-wrap gap-2">
         <button
-          key={grade}
-          onClick={() => onGradeChange(grade === selectedGrade ? "all" : grade)}
+          onClick={() => onGradeChange("all")}
           className={`text-xs font-medium px-2.5 py-1 rounded-full transition-colors ${
-            grade === selectedGrade
-              ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
-              : `${GRADE_COLORS[grade]} ${GRADE_COLORS_DARK[grade]}`
-          }`}
-        >
-          {grade}
-        </button>
-      ))}
-
-      <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1 hidden sm:block" />
-
-      {/* Status pills */}
-      {(["all", "sent", "project"] as const).map((s) => (
-        <button
-          key={s}
-          onClick={() => onStatusChange(s)}
-          className={`text-xs font-medium px-2.5 py-1 rounded-full transition-colors capitalize ${
-            status === s
+            selectedGrade === "all"
               ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
               : "bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
           }`}
         >
-          {s === "all" ? "All status" : s === "sent" ? "Sent" : "Project"}
+          All Grades
         </button>
-      ))}
+        {grades.map((grade) => (
+          <button
+            key={grade}
+            onClick={() => onGradeChange(grade === selectedGrade ? "all" : grade)}
+            className={`text-xs font-medium px-2.5 py-1 rounded-full transition-colors ${
+              grade === selectedGrade
+                ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
+                : `${GRADE_COLORS[grade]} ${GRADE_COLORS_DARK[grade]}`
+            }`}
+          >
+            {grade}
+          </button>
+        ))}
+      </div>
+
+      {/* Status pills */}
+      <div className="flex flex-wrap gap-2">
+        {(["all", "sent", "project"] as const).map((s) => (
+          <button
+            key={s}
+            onClick={() => onStatusChange(s)}
+            className={`text-xs font-medium px-2.5 py-1 rounded-full transition-colors capitalize ${
+              status === s
+                ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
+                : "bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+            }`}
+          >
+            {s === "all" ? "All Status" : s === "sent" ? "Sent" : "Project"}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
