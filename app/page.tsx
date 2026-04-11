@@ -49,7 +49,7 @@ export default function Home() {
             </div>
           </div>
           <motion.div
-            className="text-xl sm:text-2xl leading-relaxed flex flex-col gap-3"
+            className="text-lg sm:text-xl leading-relaxed flex flex-col gap-3"
             initial="hidden"
             animate="visible"
             transition={{ staggerChildren: 0.2 }}

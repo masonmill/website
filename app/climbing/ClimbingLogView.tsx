@@ -35,6 +35,7 @@ interface SessionRow {
   attempts: number;
   incline: number;
   sent: boolean;
+  label: SendLabel;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -58,6 +59,7 @@ const GRADE_COLORS_DARK: Record<string, string> = {
 };
 
 type StatusFilter = "all" | "sent" | "project";
+type SendLabel = "Flash" | "Day flash" | "Repeat" | "Sent" | "Project";
 
 // ─── Animation variants ───────────────────────────────────────────────────────
 
@@ -202,7 +204,7 @@ function computeStats(climbs: LogClimb[]) {
 
 function StatCard({ value, label }: { value: string; label: string }) {
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col rounded-lg bg-gray-50 dark:bg-gray-800/50 px-3.5 py-3">
       <span className="text-2xl font-bold tracking-tight">{value}</span>
       <span className="text-xs text-gray-500 dark:text-gray-400">{label}</span>
     </div>
@@ -365,19 +367,35 @@ function StatsPanel({ stats }: { stats: ReturnType<typeof computeStats> }) {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function flattenClimbs(climbs: LogClimb[]): SessionRow[] {
-  return climbs.flatMap((climb) =>
-    climb.sessions.map((session) => ({
-      climbId: climb.id,
-      sessionId: session.id,
-      name: climb.name,
-      board: climb.board,
-      grade: climb.grade,
-      timestamp: session.timestamp,
-      attempts: session.attempts,
-      incline: session.incline,
-      sent: session.sent,
-    }))
-  );
+  return climbs.flatMap((climb) => {
+    // Sort once per climb so sendLabel doesn't re-sort per row.
+    const sorted = [...climb.sessions].sort((a, b) => a.timestamp - b.timestamp);
+    return climb.sessions.map((session) => {
+      const idx = sorted.findIndex((s) => s.id === session.id);
+      const label = computeLabel(session, idx, sorted);
+      return {
+        climbId: climb.id,
+        sessionId: session.id,
+        name: climb.name,
+        board: climb.board,
+        grade: climb.grade,
+        timestamp: session.timestamp,
+        attempts: session.attempts,
+        incline: session.incline,
+        sent: session.sent,
+        label,
+      };
+    });
+  });
+}
+
+function computeLabel(session: LogSession, idx: number, sortedSessions: LogSession[]): SendLabel {
+  if (!session.sent) return "Project";
+  const previouslySent = sortedSessions.slice(0, idx).some((s) => s.sent);
+  if (previouslySent) return "Repeat";
+  if (session.attempts === 1 && idx === 0) return "Flash";
+  if (session.attempts === 1) return "Day flash";
+  return "Sent";
 }
 
 function dateKey(timestamp: number): string {
@@ -413,25 +431,12 @@ function totalSessions(climbs: LogClimb[]): number {
   return daySet.size;
 }
 
-type SendLabel = "Flash" | "Day flash" | "Repeat" | "Sent" | "Project";
-
-function sendLabel(climb: LogClimb, session: LogSession): SendLabel {
-  if (!session.sent) return "Project";
-  const sorted = [...climb.sessions].sort((a, b) => a.timestamp - b.timestamp);
-  const idx = sorted.findIndex((s) => s.id === session.id);
-  const previouslySent = sorted.slice(0, idx).some((s) => s.sent);
-  if (previouslySent) return "Repeat";
-  if (session.attempts === 1 && idx === 0) return "Flash";
-  if (session.attempts === 1) return "Day flash";
-  return "Sent";
-}
-
 const LABEL_COLORS: Record<SendLabel, string> = {
   "Flash":     "text-green-600 dark:text-green-400",
   "Day flash": "text-green-600 dark:text-green-400",
   "Repeat":    "text-blue-600 dark:text-blue-400",
   "Sent":      "text-green-600 dark:text-green-400",
-  "Project":   "text-gray-400 dark:text-gray-500",
+  "Project":   "text-gray-300 dark:text-gray-600",
 };
 
 // ─── Filter Bar ───────────────────────────────────────────────────────────────
@@ -501,7 +506,9 @@ function FilterBar({
 // ─── Expanded Climb Detail ────────────────────────────────────────────────────
 
 function ClimbHistory({ climb, activeSessionId }: { climb: LogClimb; activeSessionId: number }) {
-  const sorted = [...climb.sessions].sort((a, b) => b.timestamp - a.timestamp);
+  // Sort chronologically once for label computation, then reverse for display.
+  const chronological = [...climb.sessions].sort((a, b) => a.timestamp - b.timestamp);
+  const sorted = [...chronological].reverse();
   const totalAttempts = sorted.reduce((sum, s) => sum + s.attempts, 0);
   const everSent = sorted.some((s) => s.sent);
 
@@ -530,7 +537,8 @@ function ClimbHistory({ climb, activeSessionId }: { climb: LogClimb; activeSessi
           <div className="flex flex-col gap-1">
             {sorted.map((session) => {
               const isActive = session.id === activeSessionId;
-              const label = sendLabel(climb, session);
+              const idx = chronological.findIndex((s) => s.id === session.id);
+              const label = computeLabel(session, idx, chronological);
               return (
                 <div
                   key={session.id}
@@ -586,10 +594,15 @@ export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null 
     return GRADES.filter((g) => gradeSet.has(g));
   }, [climbs]);
 
-  // Apply filters
-  const filtered = useMemo(() => {
+  // Flatten + sort once when climbs change (not on every filter toggle).
+  const allRows = useMemo(() => {
     if (!climbs) return [];
-    let rows = flattenClimbs(climbs).sort((a, b) => b.timestamp - a.timestamp);
+    return flattenClimbs(climbs).sort((a, b) => b.timestamp - a.timestamp);
+  }, [climbs]);
+
+  // Apply filters (cheap subset of the pre-sorted array).
+  const filtered = useMemo(() => {
+    let rows = allRows;
     if (gradeFilter !== "all") {
       rows = rows.filter((r) => r.grade === gradeFilter);
     }
@@ -599,7 +612,7 @@ export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null 
       rows = rows.filter((r) => !r.sent);
     }
     return rows;
-  }, [climbs, gradeFilter, statusFilter]);
+  }, [allRows, gradeFilter, statusFilter]);
 
   const groups = useMemo(() => groupByDate(filtered), [filtered]);
 
@@ -625,7 +638,7 @@ export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null 
               <p className="text-gray-400 mt-1 text-sm">Unavailable right now.</p>
             ) : (
               <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">
-                {climbs.length} problem{climbs.length !== 1 ? "s" : ""} · {totalSessions(climbs)} session{totalSessions(climbs) !== 1 ? "s" : ""}
+                {(() => { const s = totalSessions(climbs); return <>{climbs.length} problem{climbs.length !== 1 ? "s" : ""} · {s} session{s !== 1 ? "s" : ""}</>; })()}
               </p>
             )}
           </div>
@@ -716,14 +729,9 @@ export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null 
                               </div>
 
                               <div className="flex flex-col items-end gap-1 shrink-0 pt-0.5">
-                                {(() => {
-                                  const label = climb ? sendLabel(climb, { id: row.sessionId, timestamp: row.timestamp, attempts: row.attempts, incline: row.incline, sent: row.sent }) : (row.sent ? "Sent" : "Project") as SendLabel;
-                                  return (
-                                    <span className={`text-sm sm:text-base font-medium ${LABEL_COLORS[label]}`}>
-                                      {label}
-                                    </span>
-                                  );
-                                })()}
+                                <span className={`text-sm sm:text-base font-medium ${LABEL_COLORS[row.label]}`}>
+                                  {row.label === "Project" ? "—" : row.label}
+                                </span>
                               </div>
                             </div>
 
