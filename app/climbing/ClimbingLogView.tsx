@@ -34,7 +34,9 @@ interface SessionRow {
   timestamp: number;
   attempts: number;
   incline: number;
-  sent: boolean;
+  // True if any session of this climb has been sent. Once a climb is sent,
+  // earlier project attempts are no longer treated as projects.
+  climbSent: boolean;
   label: SendLabel;
 }
 
@@ -370,6 +372,7 @@ function flattenClimbs(climbs: LogClimb[]): SessionRow[] {
   return climbs.flatMap((climb) => {
     // Sort once per climb so sendLabel doesn't re-sort per row.
     const sorted = [...climb.sessions].sort((a, b) => a.timestamp - b.timestamp);
+    const climbSent = climb.sessions.some((s) => s.sent);
     return climb.sessions.map((session) => {
       const idx = sorted.findIndex((s) => s.id === session.id);
       const label = computeLabel(session, idx, sorted);
@@ -382,7 +385,7 @@ function flattenClimbs(climbs: LogClimb[]): SessionRow[] {
         timestamp: session.timestamp,
         attempts: session.attempts,
         incline: session.incline,
-        sent: session.sent,
+        climbSent,
         label,
       };
     });
@@ -607,9 +610,9 @@ export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null 
       rows = rows.filter((r) => r.grade === gradeFilter);
     }
     if (statusFilter === "sent") {
-      rows = rows.filter((r) => r.sent);
+      rows = rows.filter((r) => r.climbSent);
     } else if (statusFilter === "project") {
-      rows = rows.filter((r) => !r.sent);
+      rows = rows.filter((r) => !r.climbSent);
     }
     return rows;
   }, [allRows, gradeFilter, statusFilter]);
