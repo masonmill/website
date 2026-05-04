@@ -218,6 +218,11 @@ function WeeklyHeatmap({ weeks }: { weeks: WeekBucket[] }) {
 
   if (weeks.length === 0) return null;
 
+  // Resting summary: total weeks visualized + avg sessions per active week.
+  const activeWeeks = weeks.filter((w) => w.sessions > 0).length;
+  const totalSessions = weeks.reduce((sum, w) => sum + w.sessions, 0);
+  const avgPerWeek = activeWeeks > 0 ? (totalSessions / activeWeeks).toFixed(1) : "0";
+
   // Activity score: attempts are the primary driver of volume; gym days add a
   // small bonus so a day with many short sessions still registers higher than
   // a single casual visit with the same attempt count.
@@ -279,25 +284,17 @@ function WeeklyHeatmap({ weeks }: { weeks: WeekBucket[] }) {
             {weekRange(hoveredWeek.weekStart)} — Rest week
           </p>
         ) : (
-          <p className="text-xs text-gray-400 dark:text-gray-500">Hover over a week for details</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">
+            {weeks.length} week{weeks.length !== 1 ? "s" : ""} · {avgPerWeek} sessions/week avg
+          </p>
         )}
       </div>
 
-      <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-400 dark:text-gray-500">
-        <span>Less</span>
-        <span className="w-3 h-3 rounded-sm bg-gray-100 dark:bg-gray-800" />
-        <span className="w-3 h-3 rounded-sm bg-green-200 dark:bg-green-900" />
-        <span className="w-3 h-3 rounded-sm bg-green-400 dark:bg-green-700" />
-        <span className="w-3 h-3 rounded-sm bg-green-600 dark:bg-green-500" />
-        <span>More</span>
-      </div>
     </div>
   );
 }
 
 function StatsPanel({ stats }: { stats: ReturnType<typeof computeStats> }) {
-  const maxTotal = Math.max(...stats.gradePyramid.map((g) => g.total), 1);
-
   return (
     <div className="flex flex-col gap-8">
       {/* Stat cards */}
@@ -322,7 +319,7 @@ function StatsPanel({ stats }: { stats: ReturnType<typeof computeStats> }) {
         <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-3">
           Grade Pyramid
         </h3>
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2.5">
           {stats.gradePyramid.map((g) => (
             <div key={g.grade} className="flex items-center gap-2">
               <span
@@ -332,29 +329,35 @@ function StatsPanel({ stats }: { stats: ReturnType<typeof computeStats> }) {
               >
                 {g.grade}
               </span>
-              <div className="flex-1 h-5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden flex">
-                <div
-                  className="h-full bg-green-400 dark:bg-green-600 transition-all"
-                  style={{ width: `${(g.sent / maxTotal) * 100}%` }}
-                />
-                <div
-                  className="h-full bg-gray-300 dark:bg-gray-600 transition-all"
-                  style={{ width: `${((g.total - g.sent) / maxTotal) * 100}%` }}
-                />
+              {/* Tally: filled square per send, outlined per project */}
+              <div className="flex-1 flex flex-wrap gap-1 items-center">
+                {Array.from({ length: g.sent }).map((_, i) => (
+                  <span
+                    key={`s${i}`}
+                    className="w-2.5 h-2.5 rounded-sm bg-green-500 dark:bg-green-500"
+                  />
+                ))}
+                {Array.from({ length: g.total - g.sent }).map((_, i) => (
+                  <span
+                    key={`p${i}`}
+                    className="w-2.5 h-2.5 rounded-sm border border-gray-300 dark:border-gray-600 box-border"
+                  />
+                ))}
               </div>
-              <span className="text-xs text-gray-500 dark:text-gray-400 w-12 text-right shrink-0">
+              <span className="text-xs text-gray-500 dark:text-gray-400 w-11 text-right shrink-0 font-mono tabular-nums">
                 {g.sent}/{g.total}
               </span>
             </div>
           ))}
         </div>
-        <div className="flex items-center gap-3 mt-2 text-xs text-gray-400 dark:text-gray-500">
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-green-400 dark:bg-green-600" />
+        {/* Tally legend */}
+        <div className="flex items-center gap-3 mt-3 text-xs text-gray-400 dark:text-gray-500">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-sm bg-green-500 dark:bg-green-500" />
             Sent
           </span>
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600" />
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-sm border border-gray-300 dark:border-gray-600 box-border" />
             Project
           </span>
         </div>
@@ -434,12 +437,26 @@ function totalSessions(climbs: LogClimb[]): number {
   return daySet.size;
 }
 
-const LABEL_COLORS: Record<SendLabel, string> = {
-  "Flash":     "text-green-600 dark:text-green-400",
-  "Day flash": "text-green-600 dark:text-green-400",
-  "Repeat":    "text-blue-600 dark:text-blue-400",
-  "Sent":      "text-green-600 dark:text-green-400",
-  "Project":   "text-gray-300 dark:text-gray-600",
+// Tailwind class bundles per send-label. Flash gets the loudest treatment
+// (filled pill), Day flash stays as plain bold text, Sent/Repeat become
+// outlined pills, Project is a muted gray text label.
+const LABEL_STYLES: Record<SendLabel, string> = {
+  "Flash":
+    "inline-block px-2.5 py-0.5 rounded-full text-xs font-bold tracking-wide " +
+    "bg-green-500 text-white dark:bg-green-500 dark:text-white " +
+    "ring-2 ring-green-500/20",
+  "Day flash":
+    "text-sm font-semibold text-green-600 dark:text-green-400",
+  "Sent":
+    "inline-block px-2 py-0.5 rounded-full text-xs font-semibold " +
+    "border border-green-600 text-green-600 " +
+    "dark:border-green-400 dark:text-green-400",
+  "Repeat":
+    "inline-block px-2 py-0.5 rounded-full text-xs font-semibold " +
+    "border border-blue-600 text-blue-600 " +
+    "dark:border-blue-400 dark:text-blue-400",
+  "Project":
+    "text-sm font-medium text-gray-400 dark:text-gray-500",
 };
 
 // ─── Filter Bar ───────────────────────────────────────────────────────────────
@@ -561,8 +578,8 @@ function ClimbHistory({ climb, activeSessionId }: { climb: LogClimb; activeSessi
                   <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">
                     <span>{session.attempts} attempt{session.attempts !== 1 ? "s" : ""}</span>
                     <span>{session.incline}°</span>
-                    <span className={`w-16 text-right font-medium ${LABEL_COLORS[label]}`}>
-                      {label === "Project" ? "—" : label}
+                    <span className="w-16 text-right">
+                      <span className={LABEL_STYLES[label]}>{label}</span>
                     </span>
                   </div>
                 </div>
@@ -732,9 +749,7 @@ export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null 
                               </div>
 
                               <div className="flex flex-col items-end gap-1 shrink-0 pt-0.5">
-                                <span className={`text-sm sm:text-base font-medium ${LABEL_COLORS[row.label]}`}>
-                                  {row.label === "Project" ? "—" : row.label}
-                                </span>
+                                <span className={LABEL_STYLES[row.label]}>{row.label}</span>
                               </div>
                             </div>
 
