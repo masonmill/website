@@ -9,10 +9,9 @@ import { addSession, deleteSession, editClimb, editSession, logSession, type Ope
 
 // ─── Shared result shape ────────────────────────────────────────────────
 //
-// Every write action in this file (only `logSessionAction` so far; later
-// slices add add-session/edit-session/delete-session/edit-climb alongside
-// it) returns one of these three outcomes so the client form code can
-// handle them uniformly.
+// Every write action in this file (logSessionAction, addSessionAction,
+// editSessionAction, deleteSessionAction, editClimbAction) returns one of
+// these three outcomes so the client form code can handle them uniformly.
 
 export type ActionResult<T> =
   | { ok: true; value: T }
