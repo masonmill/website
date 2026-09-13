@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default async function ClimbingPage() {
   try {
-    const result = await readLog();
+    const result = await readLog("cached");
     if (!result.ok) return <ClimbingLogView climbs={null} />;
     return <ClimbingLogView climbs={result.value.log.climbs} />;
   } catch {

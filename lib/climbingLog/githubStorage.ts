@@ -48,15 +48,26 @@ async function extractGithubErrorMessage(res: Response): Promise<string> {
 
 /**
  * Reads the current log.json from the climbinglog repo via the GitHub
- * Contents API. Always uncached: no HTTP caching, no Next.js fetch cache.
+ * Contents API.
+ *
+ * `mode: "fresh"` (default) never uses HTTP or Next.js fetch caching — used
+ * before every write, so the operation always applies to the latest file
+ * and blob SHA.
+ *
+ * `mode: "cached"` opts into Next's persistent Data Cache (kept until a
+ * write calls revalidatePath("/climbing")) so the public page stays
+ * statically served between edits instead of hitting GitHub on every
+ * request and being forced into fully dynamic rendering.
  */
-export async function readLog(): Promise<StorageResult<{ log: Log; sha: string }>> {
+export async function readLog(
+  mode: "fresh" | "cached" = "fresh"
+): Promise<StorageResult<{ log: Log; sha: string }>> {
   const token = requireToken();
 
   let res: Response;
   try {
     res = await fetch(contentsUrl(), {
-      cache: "no-store",
+      ...(mode === "fresh" ? { cache: "no-store" as const } : { next: { revalidate: false } }),
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: "application/vnd.github+json",
@@ -114,7 +125,7 @@ async function putLog(log: Log, sha: string, commitMessage: string): Promise<Res
 export async function applyLogOperation(
   operation: (log: Log) => Result<OperationSuccess>
 ): Promise<StorageResult<OperationSuccess>> {
-  const readResult = await readLog();
+  const readResult = await readLog("fresh");
   if (!readResult.ok) return readResult;
 
   const opResult = operation(readResult.value.log);
@@ -132,7 +143,7 @@ export async function applyLogOperation(
   }
 
   if (res.status === 409 || res.status === 422) {
-    const retryReadResult = await readLog();
+    const retryReadResult = await readLog("fresh");
     if (!retryReadResult.ok) return retryReadResult;
 
     const retryOpResult = operation(retryReadResult.value.log);
