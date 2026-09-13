@@ -102,3 +102,103 @@ describe("logSessionAction", () => {
     });
   });
 });
+
+describe("addSessionAction", () => {
+  beforeEach(() => {
+    cookieValue = undefined;
+    applyLogOperationMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const validInput = {
+    climbId: 3,
+    timestamp: 1_700_000_000,
+    attempts: 1,
+    incline: 40,
+    sent: false,
+  };
+
+  it("returns 401 and calls no GitHub operation when there is no session", async () => {
+    const { addSessionAction } = await import("../actions");
+    const result = await addSessionAction(validInput);
+    expect(result).toEqual({ ok: false, kind: "unauthorized", status: 401 });
+    expect(applyLogOperationMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 and calls no GitHub operation for a non-owner session", async () => {
+    cookieValue = createSessionToken(OTHER_ID, SECRET);
+    const { addSessionAction } = await import("../actions");
+    const result = await addSessionAction(validInput);
+    expect(result).toEqual({ ok: false, kind: "unauthorized", status: 403 });
+    expect(applyLogOperationMock).not.toHaveBeenCalled();
+  });
+
+  it("calls applyLogOperation with an operation that adds the session for a valid owner session", async () => {
+    cookieValue = createSessionToken(OWNER_ID, SECRET);
+    const fakeSuccess = {
+      log: { nextClimbID: 1, climbs: [] },
+      commitMessage: "Log session: Existing Problem",
+      climbId: 3,
+      sessionId: 0,
+    };
+    applyLogOperationMock.mockResolvedValueOnce({ ok: true, value: fakeSuccess });
+
+    const { addSessionAction } = await import("../actions");
+    const result = await addSessionAction(validInput);
+
+    expect(applyLogOperationMock).toHaveBeenCalledTimes(1);
+    const operation = applyLogOperationMock.mock.calls[0][0] as (log: unknown) => unknown;
+    const opResult = operation({
+      nextClimbID: 4,
+      climbs: [
+        {
+          id: 3,
+          name: "Existing Problem",
+          board: "MoonBoard 2024",
+          grade: "7a/V6",
+          nextSessionID: 0,
+          sessions: [],
+        },
+      ],
+    }) as { ok: boolean; value?: { commitMessage: string; climbId: number } };
+    expect(opResult.ok).toBe(true);
+    expect(opResult.value?.commitMessage).toBe("Log session: Existing Problem");
+
+    expect(result).toEqual({ ok: true, value: fakeSuccess });
+  });
+
+  it("rejects invalid input (attempts=0) with a field-specific error and calls no GitHub operation", async () => {
+    cookieValue = createSessionToken(OWNER_ID, SECRET);
+    applyLogOperationMock.mockImplementationOnce(async (operation: (log: unknown) => unknown) => {
+      return operation({
+        nextClimbID: 4,
+        climbs: [
+          {
+            id: 3,
+            name: "Existing Problem",
+            board: "MoonBoard 2024",
+            grade: "7a/V6",
+            nextSessionID: 0,
+            sessions: [],
+          },
+        ],
+      });
+    });
+
+    const { addSessionAction } = await import("../actions");
+    const result = await addSessionAction({ ...validInput, attempts: 0 });
+
+    expect(result).toEqual({
+      ok: false,
+      kind: "storage",
+      error: {
+        type: "validation",
+        field: "attempts",
+        message: "Attempts must be an integer between 1 and 999.",
+      },
+    });
+  });
+});

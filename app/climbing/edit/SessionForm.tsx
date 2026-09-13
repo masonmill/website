@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { BOARDS, GRADES, type Board, type Grade } from "@/lib/climbingLog/climbingLog";
 import { computeNewSessionTimestamp, toDateInputValue } from "@/lib/climbingLog/timestamp";
-import { logSessionAction, type ActionResult } from "./actions";
+import { addSessionAction, logSessionAction, type ActionResult } from "./actions";
 import type { OperationSuccess } from "@/lib/climbingLog/climbingLog";
 
 // ─── Types ────────────────────────────────────────────────────────────────
@@ -15,9 +15,27 @@ export interface SessionFormClimbOption {
   grade: Grade;
 }
 
+/** Identifies an already-known climb the session is being added to. */
+export interface SessionFormFixedClimb {
+  id: number;
+  name: string;
+  board: Board;
+  grade: Grade;
+}
+
 export interface SessionFormProps {
-  /** All known climbs, used for name autocomplete. */
-  climbs: SessionFormClimbOption[];
+  /**
+   * All known climbs, used for name autocomplete. Only used (and only
+   * required) when `fixedClimb` is not set.
+   */
+  climbs?: SessionFormClimbOption[];
+  /**
+   * When set, the form is in "add session to a known climb" mode (opened
+   * from a climb's detail page): the Problem section (name/board/grade) is
+   * omitted and the session is added directly to this climb via
+   * `addSessionAction` instead of `logSessionAction`.
+   */
+  fixedClimb?: SessionFormFixedClimb;
   onCancel: () => void;
   /** Called after a successful save so the caller can refresh data and close the form. */
   onSuccess: () => void;
@@ -38,11 +56,11 @@ function errorMessage(result: Extract<ActionResult<OperationSuccess>, { ok: fals
 
 // ─── Component ──────────────────────────────────────────────────────────
 
-export function SessionForm({ climbs, onCancel, onSuccess }: SessionFormProps) {
-  const [name, setName] = useState("");
-  const [board, setBoard] = useState<Board>(DEFAULT_BOARD);
-  const [grade, setGrade] = useState<Grade>(DEFAULT_GRADE);
-  const [locked, setLocked] = useState(false);
+export function SessionForm({ climbs = [], fixedClimb, onCancel, onSuccess }: SessionFormProps) {
+  const [name, setName] = useState(fixedClimb?.name ?? "");
+  const [board, setBoard] = useState<Board>(fixedClimb?.board ?? DEFAULT_BOARD);
+  const [grade, setGrade] = useState<Grade>(fixedClimb?.grade ?? DEFAULT_GRADE);
+  const [locked, setLocked] = useState(fixedClimb != null);
   const [date, setDate] = useState(() => toDateInputValue(new Date()));
   const [attempts, setAttempts] = useState(1);
   const [incline, setIncline] = useState(40);
@@ -53,10 +71,10 @@ export function SessionForm({ climbs, onCancel, onSuccess }: SessionFormProps) {
   const trimmedName = name.trim();
 
   const suggestions = useMemo(() => {
-    if (trimmedName.length === 0) return [];
+    if (fixedClimb || trimmedName.length === 0) return [];
     const lower = trimmedName.toLowerCase();
     return climbs.filter((c) => c.name.toLowerCase().includes(lower));
-  }, [climbs, trimmedName]);
+  }, [climbs, fixedClimb, trimmedName]);
 
   function handleNameChange(value: string) {
     const trimmed = value.trim();
@@ -92,15 +110,23 @@ export function SessionForm({ climbs, onCancel, onSuccess }: SessionFormProps) {
     setError(null);
 
     const timestamp = computeNewSessionTimestamp(date, new Date());
-    const result = await logSessionAction({
-      name,
-      board,
-      grade,
-      timestamp,
-      attempts,
-      incline,
-      sent,
-    });
+    const result = fixedClimb
+      ? await addSessionAction({
+          climbId: fixedClimb.id,
+          timestamp,
+          attempts,
+          incline,
+          sent,
+        })
+      : await logSessionAction({
+          name,
+          board,
+          grade,
+          timestamp,
+          attempts,
+          incline,
+          sent,
+        });
 
     setSubmitting(false);
 
@@ -120,6 +146,7 @@ export function SessionForm({ climbs, onCancel, onSuccess }: SessionFormProps) {
       >
         <h2 className="text-lg font-semibold">New Session</h2>
 
+        {!fixedClimb && (
         <section className="flex flex-col gap-3">
           <h3 className="text-xs font-semibold uppercase tracking-widest text-neutral-400">
             Problem
@@ -187,6 +214,7 @@ export function SessionForm({ climbs, onCancel, onSuccess }: SessionFormProps) {
             </select>
           </label>
         </section>
+        )}
 
         <section className="flex flex-col gap-3">
           <h3 className="text-xs font-semibold uppercase tracking-widest text-neutral-400">

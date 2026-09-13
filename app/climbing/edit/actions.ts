@@ -5,7 +5,7 @@ import { authorize } from "@/lib/auth/authorize";
 import { getOwnerGithubId, getSessionSecret } from "@/lib/auth/config";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/session";
 import { applyLogOperation, type GitHubStorageError } from "@/lib/climbingLog/githubStorage";
-import { logSession, type OperationSuccess } from "@/lib/climbingLog/climbingLog";
+import { addSession, logSession, type OperationSuccess } from "@/lib/climbingLog/climbingLog";
 
 // ─── Shared result shape ────────────────────────────────────────────────
 //
@@ -56,6 +56,40 @@ export async function logSessionAction(
   }
 
   const result = await applyLogOperation((log) => logSession(log, input));
+  if (!result.ok) {
+    return { ok: false, kind: "storage", error: result.error };
+  }
+  return { ok: true, value: result.value };
+}
+
+export interface AddSessionActionInput {
+  climbId: number;
+  timestamp: number;
+  attempts: number;
+  incline: number;
+  sent: boolean;
+}
+
+/**
+ * Adds a session to an already-known climb. Used by the "New Session" form
+ * opened from a climb's detail page, where the Problem section is omitted.
+ */
+export async function addSessionAction(
+  input: AddSessionActionInput
+): Promise<ActionResult<OperationSuccess>> {
+  const auth = await requireOwner();
+  if (!auth.ok) {
+    return { ok: false, kind: "unauthorized", status: auth.status };
+  }
+
+  const result = await applyLogOperation((log) =>
+    addSession(log, input.climbId, {
+      timestamp: input.timestamp,
+      attempts: input.attempts,
+      incline: input.incline,
+      sent: input.sent,
+    })
+  );
   if (!result.ok) {
     return { ok: false, kind: "storage", error: result.error };
   }

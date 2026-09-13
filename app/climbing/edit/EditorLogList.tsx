@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   buildEditorListData,
   formatAttempts,
@@ -48,7 +49,10 @@ function SessionLabel({ label }: { label: SendLabel }) {
 
 function SessionRowView({ row }: { row: EditorSessionRow }) {
   return (
-    <div className="flex items-center justify-between gap-3 px-3 py-3 sm:px-4">
+    <Link
+      href={`/climbing/edit/climb/${row.climbId}?session=${row.sessionId}`}
+      className="flex items-center justify-between gap-3 px-3 py-3 hover:bg-neutral-50 sm:px-4 dark:hover:bg-neutral-800"
+    >
       <div className="flex min-w-0 flex-col gap-0.5">
         <span className="truncate text-base font-medium text-neutral-900 dark:text-neutral-100">
           {row.name}
@@ -60,7 +64,7 @@ function SessionRowView({ row }: { row: EditorSessionRow }) {
       <div className="shrink-0">
         <SessionLabel label={row.label} />
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -153,14 +157,18 @@ export function EditorLogList({ log }: { log: Log }) {
           </p>
           <div className="flex flex-col divide-y divide-neutral-100 rounded-xl border border-neutral-100 dark:divide-neutral-800 dark:border-neutral-800">
             {data.climbsWithNoSessions.map((climb) => (
-              <div key={climb.climbId} className="flex flex-col gap-0.5 px-3 py-3 sm:px-4">
+              <Link
+                key={climb.climbId}
+                href={`/climbing/edit/climb/${climb.climbId}`}
+                className="flex flex-col gap-0.5 px-3 py-3 hover:bg-neutral-50 sm:px-4 dark:hover:bg-neutral-800"
+              >
                 <span className="truncate text-base font-medium text-neutral-900 dark:text-neutral-100">
                   {climb.name}
                 </span>
                 <span className="text-sm text-neutral-500 dark:text-neutral-400">
                   {climb.grade} · {climb.boardShort}
                 </span>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
