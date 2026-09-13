@@ -8,6 +8,7 @@ import { buildClimbDetailRows, computeSendsCount } from "@/lib/climbingLog/climb
 import { formatAttempts } from "@/lib/climbingLog/editorList";
 import { BOARD_SHORT_NAMES, type Climb, type Session } from "@/lib/climbingLog/climbingLog";
 import { SessionForm } from "../../SessionForm";
+import { ClimbForm } from "../../ClimbForm";
 import { deleteSessionAction } from "../../actions";
 
 function formatDayLabel(timestampSeconds: number): string {
@@ -28,6 +29,7 @@ export function ClimbDetail({
 }) {
   const router = useRouter();
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isEditingClimb, setIsEditingClimb] = useState(false);
   const [editingSession, setEditingSession] = useState<Session | null>(null);
   const [sessionToDelete, setSessionToDelete] = useState<Session | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -46,12 +48,14 @@ export function ClimbDetail({
   function handleFormSuccess() {
     setIsFormOpen(false);
     setEditingSession(null);
+    setIsEditingClimb(false);
     router.refresh();
   }
 
   function handleFormNotFound() {
     setIsFormOpen(false);
     setEditingSession(null);
+    setIsEditingClimb(false);
     router.refresh();
   }
 
@@ -96,14 +100,31 @@ export function ClimbDetail({
         </Link>
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-2xl font-semibold">{climb.name}</h1>
-          <button
-            type="button"
-            onClick={() => setIsFormOpen(true)}
-            aria-label="Log session"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-lg font-medium text-white hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
-          >
-            +
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            {/*
+              With no session focused, this is the detail page's only "Edit"
+              action, so it reads as "Edit". With a session focused, the
+              per-row pencil below already covers "Edit Session" for that
+              session, so this becomes a distinctly-labeled "Edit Climb"
+              action offered alongside it.
+            */}
+            <button
+              type="button"
+              onClick={() => setIsEditingClimb(true)}
+              aria-label={focusedSessionId === undefined ? "Edit" : "Edit climb"}
+              className="flex h-9 w-9 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsFormOpen(true)}
+              aria-label="Log session"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-900 text-lg font-medium text-white hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
+            >
+              +
+            </button>
+          </div>
         </div>
       </header>
 
@@ -183,6 +204,15 @@ export function ClimbDetail({
           fixedClimb={{ id: climb.id, name: climb.name, board: climb.board, grade: climb.grade }}
           onCancel={() => setIsFormOpen(false)}
           onSuccess={handleFormSuccess}
+        />
+      )}
+
+      {isEditingClimb && (
+        <ClimbForm
+          climb={{ id: climb.id, name: climb.name, board: climb.board, grade: climb.grade }}
+          onCancel={() => setIsEditingClimb(false)}
+          onSuccess={handleFormSuccess}
+          onNotFound={handleFormNotFound}
         />
       )}
 

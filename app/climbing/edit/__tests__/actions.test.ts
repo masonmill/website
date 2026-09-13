@@ -400,3 +400,102 @@ describe("deleteSessionAction", () => {
     });
   });
 });
+
+describe("editClimbAction", () => {
+  beforeEach(() => {
+    cookieValue = undefined;
+    applyLogOperationMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const validInput = { climbId: 3, name: "Arthritis 2", board: "MoonBoard 2024", grade: "7a/V6" };
+
+  const existingLog = {
+    nextClimbID: 4,
+    climbs: [
+      {
+        id: 3,
+        name: "Arthritis",
+        board: "MoonBoard 2024",
+        grade: "6c/V5",
+        nextSessionID: 1,
+        sessions: [{ id: 0, timestamp: 1_600_000_000, attempts: 1, incline: 40, sent: false }],
+      },
+    ],
+  };
+
+  it("returns 401 and calls no GitHub operation when there is no session", async () => {
+    const { editClimbAction } = await import("../actions");
+    const result = await editClimbAction(validInput);
+    expect(result).toEqual({ ok: false, kind: "unauthorized", status: 401 });
+    expect(applyLogOperationMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 and calls no GitHub operation for a non-owner session", async () => {
+    cookieValue = createSessionToken(OTHER_ID, SECRET);
+    const { editClimbAction } = await import("../actions");
+    const result = await editClimbAction(validInput);
+    expect(result).toEqual({ ok: false, kind: "unauthorized", status: 403 });
+    expect(applyLogOperationMock).not.toHaveBeenCalled();
+  });
+
+  it("calls applyLogOperation with an operation that edits the climb for a valid owner session", async () => {
+    cookieValue = createSessionToken(OWNER_ID, SECRET);
+    const fakeSuccess = {
+      log: existingLog,
+      commitMessage: "Edit climb: Arthritis 2",
+      climbId: 3,
+    };
+    applyLogOperationMock.mockResolvedValueOnce({ ok: true, value: fakeSuccess });
+
+    const { editClimbAction } = await import("../actions");
+    const result = await editClimbAction(validInput);
+
+    expect(applyLogOperationMock).toHaveBeenCalledTimes(1);
+    const operation = applyLogOperationMock.mock.calls[0][0] as (log: unknown) => unknown;
+    const opResult = operation(existingLog) as {
+      ok: boolean;
+      value?: { commitMessage: string; climbId: number };
+    };
+    expect(opResult.ok).toBe(true);
+    expect(opResult.value?.commitMessage).toBe("Edit climb: Arthritis 2");
+
+    expect(result).toEqual({ ok: true, value: fakeSuccess });
+  });
+
+  it("rejects invalid input (whitespace-only name) with a field-specific error and calls no GitHub operation", async () => {
+    cookieValue = createSessionToken(OWNER_ID, SECRET);
+    applyLogOperationMock.mockImplementationOnce(async (operation: (log: unknown) => unknown) => {
+      return operation(existingLog);
+    });
+
+    const { editClimbAction } = await import("../actions");
+    const result = await editClimbAction({ ...validInput, name: "   " });
+
+    expect(result).toEqual({
+      ok: false,
+      kind: "storage",
+      error: { type: "validation", field: "name", message: "Name must not be empty." },
+    });
+  });
+
+  it("surfaces a not-found storage error so the UI can trigger a reload", async () => {
+    cookieValue = createSessionToken(OWNER_ID, SECRET);
+    applyLogOperationMock.mockResolvedValueOnce({
+      ok: false,
+      error: { type: "not-found", message: "Climb with id 3 not found." },
+    });
+
+    const { editClimbAction } = await import("../actions");
+    const result = await editClimbAction(validInput);
+
+    expect(result).toEqual({
+      ok: false,
+      kind: "storage",
+      error: { type: "not-found", message: "Climb with id 3 not found." },
+    });
+  });
+});

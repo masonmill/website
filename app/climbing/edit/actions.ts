@@ -5,7 +5,7 @@ import { authorize } from "@/lib/auth/authorize";
 import { getOwnerGithubId, getSessionSecret } from "@/lib/auth/config";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/session";
 import { applyLogOperation, type GitHubStorageError } from "@/lib/climbingLog/githubStorage";
-import { addSession, deleteSession, editSession, logSession, type OperationSuccess } from "@/lib/climbingLog/climbingLog";
+import { addSession, deleteSession, editClimb, editSession, logSession, type OperationSuccess } from "@/lib/climbingLog/climbingLog";
 
 // ─── Shared result shape ────────────────────────────────────────────────
 //
@@ -143,6 +143,31 @@ export async function deleteSessionAction(
   }
 
   const result = await applyLogOperation((log) => deleteSession(log, input.climbId, input.sessionId));
+  if (!result.ok) {
+    return { ok: false, kind: "storage", error: result.error };
+  }
+  return { ok: true, value: result.value };
+}
+
+export interface EditClimbActionInput {
+  climbId: number;
+  name: string;
+  board: string;
+  grade: string;
+}
+
+/** Edits an existing climb's name/board/grade. */
+export async function editClimbAction(
+  input: EditClimbActionInput
+): Promise<ActionResult<OperationSuccess>> {
+  const auth = await requireOwner();
+  if (!auth.ok) {
+    return { ok: false, kind: "unauthorized", status: auth.status };
+  }
+
+  const result = await applyLogOperation((log) =>
+    editClimb(log, input.climbId, { name: input.name, board: input.board, grade: input.grade })
+  );
   if (!result.ok) {
     return { ok: false, kind: "storage", error: result.error };
   }
