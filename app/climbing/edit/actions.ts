@@ -40,6 +40,7 @@ export interface LogSessionActionInput {
   attempts: number;
   incline: number;
   sent: boolean;
+  notes?: string;
 }
 
 /**
@@ -68,6 +69,7 @@ export interface AddSessionActionInput {
   attempts: number;
   incline: number;
   sent: boolean;
+  notes?: string;
 }
 
 /**
@@ -88,6 +90,7 @@ export async function addSessionAction(
       attempts: input.attempts,
       incline: input.incline,
       sent: input.sent,
+      notes: input.notes,
     })
   );
   if (!result.ok) {
@@ -103,9 +106,10 @@ export interface EditSessionActionInput {
   attempts: number;
   incline: number;
   sent: boolean;
+  notes?: string;
 }
 
-/** Edits an existing session's timestamp/attempts/incline/sent. */
+/** Edits an existing session's timestamp/attempts/incline/sent/notes. */
 export async function editSessionAction(
   input: EditSessionActionInput
 ): Promise<ActionResult<OperationSuccess>> {
@@ -120,6 +124,7 @@ export async function editSessionAction(
       attempts: input.attempts,
       incline: input.incline,
       sent: input.sent,
+      notes: input.notes,
     })
   );
   if (!result.ok) {

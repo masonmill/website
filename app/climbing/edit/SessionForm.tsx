@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { BOARDS, GRADES, type Board, type Grade } from "@/lib/climbingLog/climbingLog";
+import { BOARDS, GRADES, NOTES_MAX_CODE_POINTS, type Board, type Grade } from "@/lib/climbingLog/climbingLog";
 import { computeEditedSessionTimestamp, computeNewSessionTimestamp, toDateInputValue } from "@/lib/climbingLog/timestamp";
 import { addSessionAction, editSessionAction, logSessionAction, type ActionResult } from "./actions";
 import type { OperationSuccess } from "@/lib/climbingLog/climbingLog";
@@ -31,6 +31,7 @@ export interface SessionFormEditSession {
   attempts: number;
   incline: number;
   sent: boolean;
+  notes?: string;
 }
 
 export interface SessionFormProps {
@@ -93,8 +94,12 @@ export function SessionForm({ climbs = [], fixedClimb, editSession, onCancel, on
   const [attempts, setAttempts] = useState(editSession?.attempts ?? 1);
   const [incline, setIncline] = useState(editSession?.incline ?? 40);
   const [sent, setSent] = useState(editSession?.sent ?? false);
+  const [notes, setNotes] = useState(editSession?.notes ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const notesCodePointCount = useMemo(() => Array.from(notes.trim()).length, [notes]);
+  const notesTooLong = notesCodePointCount > NOTES_MAX_CODE_POINTS;
 
   const trimmedName = name.trim();
 
@@ -129,7 +134,7 @@ export function SessionForm({ climbs = [], fixedClimb, editSession, onCancel, on
     setLocked(true);
   }
 
-  const canSubmit = (editSession != null || trimmedName.length > 0) && !submitting;
+  const canSubmit = (editSession != null || trimmedName.length > 0) && !submitting && !notesTooLong;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -145,6 +150,7 @@ export function SessionForm({ climbs = [], fixedClimb, editSession, onCancel, on
           attempts,
           incline,
           sent,
+          notes,
         })
       : fixedClimb
         ? await addSessionAction({
@@ -153,6 +159,7 @@ export function SessionForm({ climbs = [], fixedClimb, editSession, onCancel, on
             attempts,
             incline,
             sent,
+            notes,
           })
         : await logSessionAction({
             name,
@@ -162,6 +169,7 @@ export function SessionForm({ climbs = [], fixedClimb, editSession, onCancel, on
             attempts,
             incline,
             sent,
+            notes,
           });
 
     setSubmitting(false);
@@ -311,6 +319,26 @@ export function SessionForm({ climbs = [], fixedClimb, editSession, onCancel, on
               onChange={(e) => setSent(e.target.checked)}
               className="h-5 w-5"
             />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="flex items-center justify-between text-sm text-neutral-500">
+              <span>Notes</span>
+              <span className={notesTooLong ? "text-red-600 dark:text-red-400" : ""}>
+                {notesCodePointCount}/{NOTES_MAX_CODE_POINTS}
+              </span>
+            </span>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+              className="resize-y rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800"
+            />
+            {notesTooLong && (
+              <span className="text-sm text-red-600 dark:text-red-400">
+                Notes must be at most {NOTES_MAX_CODE_POINTS} characters.
+              </span>
+            )}
           </label>
         </section>
 

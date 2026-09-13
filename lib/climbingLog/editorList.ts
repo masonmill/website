@@ -20,6 +20,7 @@ export interface EditorSessionRow {
   attempts: number;
   incline: number;
   label: SendLabel;
+  notes?: string;
 }
 
 /** One calendar-day bucket of session rows, newest session first. */
@@ -88,6 +89,7 @@ function flattenClimb(climb: Climb): EditorSessionRow[] {
       attempts: session.attempts,
       incline: session.incline,
       label,
+      ...(session.notes !== undefined ? { notes: session.notes } : {}),
     };
   });
   return rows;

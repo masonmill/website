@@ -17,7 +17,11 @@ export interface Session {
   attempts: number;
   incline: number;
   sent: boolean;
+  notes?: string;
 }
+
+/** Maximum number of Unicode code points allowed in a session's notes. */
+export const NOTES_MAX_CODE_POINTS = 280;
 
 export interface Climb {
   id: number;
@@ -136,6 +140,17 @@ function validateIncline(incline: number): Result<number> {
   return ok(incline);
 }
 
+function validateNotes(notes: string | undefined): Result<string | undefined> {
+  if (notes === undefined) return ok(undefined);
+  const trimmed = notes.trim();
+  if (trimmed.length === 0) return ok(undefined);
+  const codePointCount = Array.from(trimmed).length;
+  if (codePointCount > NOTES_MAX_CODE_POINTS) {
+    return err(validationError("notes", `Notes must be at most ${NOTES_MAX_CODE_POINTS} characters.`));
+  }
+  return ok(trimmed);
+}
+
 function validateSessionInput(input: SessionInput): Result<SessionInput> {
   const timestampResult = validateTimestamp(input.timestamp);
   if (!timestampResult.ok) return timestampResult;
@@ -143,11 +158,14 @@ function validateSessionInput(input: SessionInput): Result<SessionInput> {
   if (!attemptsResult.ok) return attemptsResult;
   const inclineResult = validateIncline(input.incline);
   if (!inclineResult.ok) return inclineResult;
+  const notesResult = validateNotes(input.notes);
+  if (!notesResult.ok) return notesResult;
   return ok({
     timestamp: timestampResult.value,
     attempts: attemptsResult.value,
     incline: inclineResult.value,
     sent: input.sent,
+    ...(notesResult.value !== undefined ? { notes: notesResult.value } : {}),
   });
 }
 
@@ -183,12 +201,16 @@ function parseSession(json: unknown, context: string): Result<Session> {
   if (typeof j.sent !== "boolean") {
     return err(validationError("sent", `${context}: missing or invalid sent.`));
   }
+  if (j.notes !== undefined && typeof j.notes !== "string") {
+    return err(validationError("notes", `${context}: invalid notes.`));
+  }
   return ok({
     id: j.id,
     timestamp: j.timestamp,
     attempts: j.attempts,
     incline: j.incline,
     sent: j.sent,
+    ...(typeof j.notes === "string" ? { notes: j.notes } : {}),
   });
 }
 
@@ -274,6 +296,7 @@ function sessionToJson(session: Session) {
     attempts: session.attempts,
     incline: session.incline,
     sent: session.sent,
+    ...(session.notes !== undefined ? { notes: session.notes } : {}),
   };
 }
 
@@ -313,7 +336,16 @@ export interface OperationSuccess {
  */
 export function logSession(
   log: Log,
-  input: { name: string; board: string; grade: string; timestamp: number; attempts: number; incline: number; sent: boolean },
+  input: {
+    name: string;
+    board: string;
+    grade: string;
+    timestamp: number;
+    attempts: number;
+    incline: number;
+    sent: boolean;
+    notes?: string;
+  },
 ): Result<OperationSuccess> {
   const nameResult = validateName(input.name);
   if (!nameResult.ok) return nameResult;

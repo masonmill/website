@@ -361,6 +361,111 @@ test("unknown session ID produces a not-found error", () => {
   assert.equal(result.error.type, "not-found");
 });
 
+// ─── Notes ───────────────────────────────────────────────────────────────
+
+test("a session with notes serializes with notes as the last key", () => {
+  const log = mustParse(fixtureText);
+  const climb = log.climbs[0];
+  const result = addSession(log, climb.id, {
+    timestamp: 1,
+    attempts: 1,
+    incline: 40,
+    sent: false,
+    notes: "Felt good today.",
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const serialized = serializeLog(result.value.log);
+  const sessionIdPattern = `"id": ${result.value.sessionId}`;
+  const sessionSnippetMatch = serialized.match(
+    new RegExp(`\\{\\s*${sessionIdPattern},\\s*"timestamp": 1,[\\s\\S]*?"notes": "Felt good today\\."\\s*\\}`)
+  );
+  assert.ok(sessionSnippetMatch, "expected session object with notes as last key");
+  const keys = Object.keys(JSON.parse(sessionSnippetMatch![0]));
+  assert.deepEqual(keys, ["id", "timestamp", "attempts", "incline", "sent", "notes"]);
+});
+
+test("whitespace-only notes are omitted from the session entirely", () => {
+  const log = mustParse(fixtureText);
+  const climb = log.climbs[0];
+  const result = addSession(log, climb.id, {
+    timestamp: 1,
+    attempts: 1,
+    incline: 40,
+    sent: false,
+    notes: "   ",
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const updatedClimb = result.value.log.climbs.find((c) => c.id === climb.id)!;
+  const newSession = updatedClimb.sessions.find((s) => s.id === result.value.sessionId)!;
+  assert.equal("notes" in newSession, false);
+});
+
+test("notes of exactly 280 code points is accepted", () => {
+  const log = mustParse(fixtureText);
+  const climb = log.climbs[0];
+  const notes = "😀".repeat(280);
+  assert.equal(Array.from(notes).length, 280);
+  const result = addSession(log, climb.id, {
+    timestamp: 1,
+    attempts: 1,
+    incline: 40,
+    sent: false,
+    notes,
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const updatedClimb = result.value.log.climbs.find((c) => c.id === climb.id)!;
+  const newSession = updatedClimb.sessions.find((s) => s.id === result.value.sessionId)!;
+  assert.equal(newSession.notes, notes);
+});
+
+test("notes of 281 code points is rejected with a validation error naming notes", () => {
+  const log = mustParse(fixtureText);
+  const climb = log.climbs[0];
+  const notes = "😀".repeat(281);
+  assert.equal(Array.from(notes).length, 281);
+  const result = addSession(log, climb.id, {
+    timestamp: 1,
+    attempts: 1,
+    incline: 40,
+    sent: false,
+    notes,
+  });
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.error.type, "validation");
+  assert.equal(result.error.field, "notes");
+});
+
+test("editing a session to clear existing notes removes the notes key", () => {
+  const log = mustParse(fixtureText);
+  const climb = log.climbs[0];
+  const addResult = addSession(log, climb.id, {
+    timestamp: 1,
+    attempts: 1,
+    incline: 40,
+    sent: false,
+    notes: "Original notes.",
+  });
+  assert.equal(addResult.ok, true);
+  if (!addResult.ok) return;
+
+  const editResult = editSession(addResult.value.log, climb.id, addResult.value.sessionId!, {
+    timestamp: 1,
+    attempts: 1,
+    incline: 40,
+    sent: false,
+    notes: "   ",
+  });
+  assert.equal(editResult.ok, true);
+  if (!editResult.ok) return;
+  const updatedClimb = editResult.value.log.climbs.find((c) => c.id === climb.id)!;
+  const editedSession = updatedClimb.sessions.find((s) => s.id === addResult.value.sessionId)!;
+  assert.equal("notes" in editedSession, false);
+});
+
 // ─── Session labels ──────────────────────────────────────────────────────
 
 test("first session, 1 attempt, sent is a Flash", () => {

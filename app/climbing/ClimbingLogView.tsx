@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, StickyNote } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -14,6 +14,7 @@ export interface LogSession {
   attempts: number;
   incline: number;
   sent: boolean;
+  notes?: string;
 }
 
 export interface LogClimb {
@@ -38,6 +39,7 @@ interface SessionRow {
   // earlier project attempts are no longer treated as projects.
   climbSent: boolean;
   label: SendLabel;
+  notes?: string;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -390,6 +392,7 @@ function flattenClimbs(climbs: LogClimb[]): SessionRow[] {
         incline: session.incline,
         climbSent,
         label,
+        notes: session.notes,
       };
     });
   });
@@ -598,6 +601,7 @@ export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null 
   const [gradeFilter, setGradeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [expandedClimb, setExpandedClimb] = useState<string | null>(null);
+  const [expandedNotesKey, setExpandedNotesKey] = useState<string | null>(null);
 
   const stats = useMemo(() => (climbs ? computeStats(climbs) : null), [climbs]);
 
@@ -638,6 +642,10 @@ export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null 
 
   const toggleExpand = (key: string) => {
     setExpandedClimb((prev) => (prev === key ? null : key));
+  };
+
+  const toggleNotes = (key: string) => {
+    setExpandedNotesKey((prev) => (prev === key ? null : key));
   };
 
   return (
@@ -704,6 +712,8 @@ export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null 
                         const isExpanded = expandedClimb === key;
                         const climb = climbMap.get(row.climbId);
                         const hasHistory = climb && climb.sessions.length > 1;
+                        const hasNotes = row.notes !== undefined && row.notes.length > 0;
+                        const notesExpanded = expandedNotesKey === key;
 
                         return (
                           <div
@@ -732,6 +742,23 @@ export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null 
                                       />
                                     </span>
                                   )}
+                                  {hasNotes && (
+                                    <button
+                                      type="button"
+                                      aria-label={notesExpanded ? "Hide notes" : "Show notes"}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleNotes(key);
+                                      }}
+                                      className={`shrink-0 rounded p-1 transition-colors ${
+                                        notesExpanded
+                                          ? "text-gray-700 dark:text-gray-200"
+                                          : "text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                      }`}
+                                    >
+                                      <StickyNote size={14} />
+                                    </button>
+                                  )}
                                 </div>
                                 <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap text-sm sm:text-base text-gray-500 dark:text-gray-400">
                                   <span
@@ -746,6 +773,14 @@ export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null 
                                   <span className="text-gray-300 dark:text-gray-600">·</span>
                                   <span>{row.attempts} attempt{row.attempts !== 1 ? "s" : ""}</span>
                                 </div>
+                                {hasNotes && notesExpanded && (
+                                  <p
+                                    className="whitespace-pre-wrap text-sm text-gray-600 dark:text-gray-300"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {row.notes}
+                                  </p>
+                                )}
                               </div>
 
                               <div className="flex flex-col items-end gap-1 shrink-0 pt-0.5">

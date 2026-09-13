@@ -16,6 +16,7 @@ export interface ClimbDetailSessionRow {
   attempts: number;
   incline: number;
   sent: boolean;
+  notes?: string;
 }
 
 /**
@@ -31,5 +32,6 @@ export function buildClimbDetailRows(sessions: Session[]): ClimbDetailSessionRow
       attempts: s.attempts,
       incline: s.incline,
       sent: s.sent,
+      ...(s.notes !== undefined ? { notes: s.notes } : {}),
     }));
 }

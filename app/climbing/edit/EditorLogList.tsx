@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Trash2 } from "lucide-react";
+import { StickyNote, Trash2 } from "lucide-react";
 import {
   buildEditorListData,
   formatAttempts,
@@ -49,33 +49,63 @@ function SessionLabel({ label }: { label: SendLabel }) {
   return <span className={LABEL_STYLES[label]}>{label}</span>;
 }
 
-function SessionRowView({ row, onDelete }: { row: EditorSessionRow; onDelete: (row: EditorSessionRow) => void }) {
+function SessionRowView({
+  row,
+  onDelete,
+  notesExpanded,
+  onToggleNotes,
+}: {
+  row: EditorSessionRow;
+  onDelete: (row: EditorSessionRow) => void;
+  notesExpanded: boolean;
+  onToggleNotes: (row: EditorSessionRow) => void;
+}) {
+  const hasNotes = row.notes !== undefined && row.notes.length > 0;
   return (
-    <div className="flex items-center gap-1 hover:bg-neutral-50 dark:hover:bg-neutral-800">
-      <Link
-        href={`/climbing/edit/climb/${row.climbId}?session=${row.sessionId}`}
-        className="flex min-w-0 flex-1 items-center justify-between gap-3 px-3 py-3 sm:px-4"
-      >
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <span className="truncate text-base font-medium text-neutral-900 dark:text-neutral-100">
-            {row.name}
-          </span>
-          <span className="text-sm text-neutral-500 dark:text-neutral-400">
-            {row.grade} · {row.boardShort} · {row.incline}° · {formatAttempts(row.attempts)}
-          </span>
-        </div>
-        <div className="shrink-0">
-          <SessionLabel label={row.label} />
-        </div>
-      </Link>
-      <button
-        type="button"
-        aria-label="Delete session"
-        onClick={() => onDelete(row)}
-        className="mr-2 shrink-0 rounded p-1 text-neutral-500 hover:bg-neutral-100 hover:text-red-600 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-red-400"
-      >
-        <Trash2 className="h-4 w-4" />
-      </button>
+    <div className="flex flex-col hover:bg-neutral-50 dark:hover:bg-neutral-800">
+      <div className="flex items-center gap-1">
+        <Link
+          href={`/climbing/edit/climb/${row.climbId}?session=${row.sessionId}`}
+          className="flex min-w-0 flex-1 items-center justify-between gap-3 px-3 py-3 sm:px-4"
+        >
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <span className="truncate text-base font-medium text-neutral-900 dark:text-neutral-100">
+              {row.name}
+            </span>
+            <span className="text-sm text-neutral-500 dark:text-neutral-400">
+              {row.grade} · {row.boardShort} · {row.incline}° · {formatAttempts(row.attempts)}
+            </span>
+          </div>
+          <div className="shrink-0">
+            <SessionLabel label={row.label} />
+          </div>
+        </Link>
+        {hasNotes && (
+          <button
+            type="button"
+            aria-label={notesExpanded ? "Hide notes" : "Show notes"}
+            onClick={() => onToggleNotes(row)}
+            className={`shrink-0 rounded p-1 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100 ${
+              notesExpanded ? "text-neutral-900 dark:text-neutral-100" : ""
+            }`}
+          >
+            <StickyNote className="h-4 w-4" />
+          </button>
+        )}
+        <button
+          type="button"
+          aria-label="Delete session"
+          onClick={() => onDelete(row)}
+          className="mr-2 shrink-0 rounded p-1 text-neutral-500 hover:bg-neutral-100 hover:text-red-600 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-red-400"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+      {hasNotes && notesExpanded && (
+        <p className="whitespace-pre-wrap px-3 pb-3 text-sm text-neutral-600 sm:px-4 dark:text-neutral-300">
+          {row.notes}
+        </p>
+      )}
     </div>
   );
 }
@@ -109,6 +139,7 @@ export function EditorLogList({ log }: { log: Log }) {
   const [sessionToDelete, setSessionToDelete] = useState<EditorSessionRow | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [expandedNotesKey, setExpandedNotesKey] = useState<string | null>(null);
 
   const climbOptions = useMemo(
     () => log.climbs.map((c) => ({ name: c.name, board: c.board, grade: c.grade })),
@@ -224,16 +255,23 @@ export function EditorLogList({ log }: { log: Log }) {
               {formatDayLabel(group.rows[0].timestamp)}
             </p>
             <div className="flex flex-col divide-y divide-neutral-100 rounded-xl border border-neutral-100 dark:divide-neutral-800 dark:border-neutral-800">
-              {group.rows.map((row) => (
-                <SessionRowView
-                  key={`${row.climbId}-${row.sessionId}`}
-                  row={row}
-                  onDelete={(r) => {
-                    setDeleteError(null);
-                    setSessionToDelete(r);
-                  }}
-                />
-              ))}
+              {group.rows.map((row) => {
+                const key = `${row.climbId}-${row.sessionId}`;
+                return (
+                  <SessionRowView
+                    key={key}
+                    row={row}
+                    onDelete={(r) => {
+                      setDeleteError(null);
+                      setSessionToDelete(r);
+                    }}
+                    notesExpanded={expandedNotesKey === key}
+                    onToggleNotes={() =>
+                      setExpandedNotesKey((prev) => (prev === key ? null : key))
+                    }
+                  />
+                );
+              })}
             </div>
           </div>
         ))}
