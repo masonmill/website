@@ -5,7 +5,7 @@ import { authorize } from "@/lib/auth/authorize";
 import { getOwnerGithubId, getSessionSecret } from "@/lib/auth/config";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/session";
 import { applyLogOperation, type GitHubStorageError } from "@/lib/climbingLog/githubStorage";
-import { addSession, logSession, type OperationSuccess } from "@/lib/climbingLog/climbingLog";
+import { addSession, deleteSession, editSession, logSession, type OperationSuccess } from "@/lib/climbingLog/climbingLog";
 
 // ─── Shared result shape ────────────────────────────────────────────────
 //
@@ -90,6 +90,59 @@ export async function addSessionAction(
       sent: input.sent,
     })
   );
+  if (!result.ok) {
+    return { ok: false, kind: "storage", error: result.error };
+  }
+  return { ok: true, value: result.value };
+}
+
+export interface EditSessionActionInput {
+  climbId: number;
+  sessionId: number;
+  timestamp: number;
+  attempts: number;
+  incline: number;
+  sent: boolean;
+}
+
+/** Edits an existing session's timestamp/attempts/incline/sent. */
+export async function editSessionAction(
+  input: EditSessionActionInput
+): Promise<ActionResult<OperationSuccess>> {
+  const auth = await requireOwner();
+  if (!auth.ok) {
+    return { ok: false, kind: "unauthorized", status: auth.status };
+  }
+
+  const result = await applyLogOperation((log) =>
+    editSession(log, input.climbId, input.sessionId, {
+      timestamp: input.timestamp,
+      attempts: input.attempts,
+      incline: input.incline,
+      sent: input.sent,
+    })
+  );
+  if (!result.ok) {
+    return { ok: false, kind: "storage", error: result.error };
+  }
+  return { ok: true, value: result.value };
+}
+
+export interface DeleteSessionActionInput {
+  climbId: number;
+  sessionId: number;
+}
+
+/** Deletes an existing session. */
+export async function deleteSessionAction(
+  input: DeleteSessionActionInput
+): Promise<ActionResult<OperationSuccess>> {
+  const auth = await requireOwner();
+  if (!auth.ok) {
+    return { ok: false, kind: "unauthorized", status: auth.status };
+  }
+
+  const result = await applyLogOperation((log) => deleteSession(log, input.climbId, input.sessionId));
   if (!result.ok) {
     return { ok: false, kind: "storage", error: result.error };
   }

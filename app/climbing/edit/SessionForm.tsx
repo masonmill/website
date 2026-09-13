@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { BOARDS, GRADES, type Board, type Grade } from "@/lib/climbingLog/climbingLog";
-import { computeNewSessionTimestamp, toDateInputValue } from "@/lib/climbingLog/timestamp";
-import { addSessionAction, logSessionAction, type ActionResult } from "./actions";
+import { computeEditedSessionTimestamp, computeNewSessionTimestamp, toDateInputValue } from "@/lib/climbingLog/timestamp";
+import { addSessionAction, editSessionAction, logSessionAction, type ActionResult } from "./actions";
 import type { OperationSuccess } from "@/lib/climbingLog/climbingLog";
 
 // ─── Types ────────────────────────────────────────────────────────────────
@@ -23,6 +23,16 @@ export interface SessionFormFixedClimb {
   grade: Grade;
 }
 
+/** Identifies an existing session being edited. */
+export interface SessionFormEditSession {
+  climbId: number;
+  sessionId: number;
+  timestamp: number;
+  attempts: number;
+  incline: number;
+  sent: boolean;
+}
+
 export interface SessionFormProps {
   /**
    * All known climbs, used for name autocomplete. Only used (and only
@@ -36,9 +46,21 @@ export interface SessionFormProps {
    * `addSessionAction` instead of `logSessionAction`.
    */
   fixedClimb?: SessionFormFixedClimb;
+  /**
+   * When set, the form is in "edit an existing session" mode: prefilled with
+   * the session's date/attempts/incline/sent, the Problem section is
+   * omitted, and the confirm button reads "Save". Takes precedence over
+   * `fixedClimb`.
+   */
+  editSession?: SessionFormEditSession;
   onCancel: () => void;
   /** Called after a successful save so the caller can refresh data and close the form. */
   onSuccess: () => void;
+  /**
+   * Called when the save fails because the target climb/session no longer
+   * exists. The caller should reload the latest data and close the form.
+   */
+  onNotFound?: () => void;
 }
 
 const DEFAULT_BOARD: Board = "MoonBoard 2019";
@@ -54,17 +76,23 @@ function errorMessage(result: Extract<ActionResult<OperationSuccess>, { ok: fals
   return result.error.message;
 }
 
+function isNotFound(result: Extract<ActionResult<OperationSuccess>, { ok: false }>): boolean {
+  return result.kind === "storage" && result.error.type === "not-found";
+}
+
 // ─── Component ──────────────────────────────────────────────────────────
 
-export function SessionForm({ climbs = [], fixedClimb, onCancel, onSuccess }: SessionFormProps) {
+export function SessionForm({ climbs = [], fixedClimb, editSession, onCancel, onSuccess, onNotFound }: SessionFormProps) {
   const [name, setName] = useState(fixedClimb?.name ?? "");
   const [board, setBoard] = useState<Board>(fixedClimb?.board ?? DEFAULT_BOARD);
   const [grade, setGrade] = useState<Grade>(fixedClimb?.grade ?? DEFAULT_GRADE);
   const [locked, setLocked] = useState(fixedClimb != null);
-  const [date, setDate] = useState(() => toDateInputValue(new Date()));
-  const [attempts, setAttempts] = useState(1);
-  const [incline, setIncline] = useState(40);
-  const [sent, setSent] = useState(false);
+  const [date, setDate] = useState(() =>
+    editSession ? toDateInputValue(new Date(editSession.timestamp * 1000)) : toDateInputValue(new Date())
+  );
+  const [attempts, setAttempts] = useState(editSession?.attempts ?? 1);
+  const [incline, setIncline] = useState(editSession?.incline ?? 40);
+  const [sent, setSent] = useState(editSession?.sent ?? false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -101,7 +129,7 @@ export function SessionForm({ climbs = [], fixedClimb, onCancel, onSuccess }: Se
     setLocked(true);
   }
 
-  const canSubmit = trimmedName.length > 0 && !submitting;
+  const canSubmit = (editSession != null || trimmedName.length > 0) && !submitting;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -109,28 +137,40 @@ export function SessionForm({ climbs = [], fixedClimb, onCancel, onSuccess }: Se
     setSubmitting(true);
     setError(null);
 
-    const timestamp = computeNewSessionTimestamp(date, new Date());
-    const result = fixedClimb
-      ? await addSessionAction({
-          climbId: fixedClimb.id,
-          timestamp,
+    const result = editSession
+      ? await editSessionAction({
+          climbId: editSession.climbId,
+          sessionId: editSession.sessionId,
+          timestamp: computeEditedSessionTimestamp(editSession.timestamp, date),
           attempts,
           incline,
           sent,
         })
-      : await logSessionAction({
-          name,
-          board,
-          grade,
-          timestamp,
-          attempts,
-          incline,
-          sent,
-        });
+      : fixedClimb
+        ? await addSessionAction({
+            climbId: fixedClimb.id,
+            timestamp: computeNewSessionTimestamp(date, new Date()),
+            attempts,
+            incline,
+            sent,
+          })
+        : await logSessionAction({
+            name,
+            board,
+            grade,
+            timestamp: computeNewSessionTimestamp(date, new Date()),
+            attempts,
+            incline,
+            sent,
+          });
 
     setSubmitting(false);
 
     if (!result.ok) {
+      if (isNotFound(result) && onNotFound) {
+        onNotFound();
+        return;
+      }
       setError(errorMessage(result));
       return;
     }
@@ -144,9 +184,9 @@ export function SessionForm({ climbs = [], fixedClimb, onCancel, onSuccess }: Se
         onSubmit={handleSubmit}
         className="flex max-h-[90vh] w-full flex-col gap-6 overflow-y-auto rounded-t-2xl bg-white p-6 shadow-xl sm:max-w-md sm:rounded-2xl dark:bg-neutral-900"
       >
-        <h2 className="text-lg font-semibold">New Session</h2>
+        <h2 className="text-lg font-semibold">{editSession ? "Edit Session" : "New Session"}</h2>
 
-        {!fixedClimb && (
+        {!fixedClimb && !editSession && (
         <section className="flex flex-col gap-3">
           <h3 className="text-xs font-semibold uppercase tracking-widest text-neutral-400">
             Problem
@@ -294,7 +334,7 @@ export function SessionForm({ climbs = [], fixedClimb, onCancel, onSuccess }: Se
             disabled={!canSubmit}
             className="rounded-full bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
           >
-            Log
+            {editSession ? "Save" : "Log"}
           </button>
         </div>
       </form>

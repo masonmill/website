@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, Circle } from "lucide-react";
+import { CheckCircle2, Circle, Pencil, Trash2 } from "lucide-react";
 import { buildClimbDetailRows, computeSendsCount } from "@/lib/climbingLog/climbDetail";
 import { formatAttempts } from "@/lib/climbingLog/editorList";
-import { BOARD_SHORT_NAMES, type Climb } from "@/lib/climbingLog/climbingLog";
+import { BOARD_SHORT_NAMES, type Climb, type Session } from "@/lib/climbingLog/climbingLog";
 import { SessionForm } from "../../SessionForm";
+import { deleteSessionAction } from "../../actions";
 
 function formatDayLabel(timestampSeconds: number): string {
   const d = new Date(timestampSeconds * 1000);
@@ -27,6 +28,10 @@ export function ClimbDetail({
 }) {
   const router = useRouter();
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingSession, setEditingSession] = useState<Session | null>(null);
+  const [sessionToDelete, setSessionToDelete] = useState<Session | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const focusedRef = useRef<HTMLDivElement | null>(null);
 
   const rows = useMemo(() => buildClimbDetailRows(climb.sessions), [climb.sessions]);
@@ -40,6 +45,46 @@ export function ClimbDetail({
 
   function handleFormSuccess() {
     setIsFormOpen(false);
+    setEditingSession(null);
+    router.refresh();
+  }
+
+  function handleFormNotFound() {
+    setIsFormOpen(false);
+    setEditingSession(null);
+    router.refresh();
+  }
+
+  function findSession(sessionId: number): Session | undefined {
+    return climb.sessions.find((s) => s.id === sessionId);
+  }
+
+  async function handleConfirmDelete() {
+    if (!sessionToDelete) return;
+    setDeleting(true);
+    setDeleteError(null);
+
+    const result = await deleteSessionAction({ climbId: climb.id, sessionId: sessionToDelete.id });
+
+    setDeleting(false);
+
+    if (!result.ok) {
+      if (result.kind === "storage" && result.error.type === "not-found") {
+        setSessionToDelete(null);
+        router.refresh();
+        return;
+      }
+      setDeleteError(
+        result.kind === "unauthorized"
+          ? result.status === 401
+            ? "You need to sign in again to make changes."
+            : "This account doesn't have access to edit the log."
+          : result.error.message
+      );
+      return;
+    }
+
+    setSessionToDelete(null);
     router.refresh();
   }
 
@@ -101,11 +146,32 @@ export function ClimbDetail({
                     {formatAttempts(row.attempts)} · {row.incline}°
                   </span>
                 </div>
-                {row.sent ? (
-                  <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600 dark:text-green-400" />
-                ) : (
-                  <Circle className="h-5 w-5 shrink-0 text-neutral-400 dark:text-neutral-600" />
-                )}
+                <div className="flex shrink-0 items-center gap-2">
+                  {row.sent ? (
+                    <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600 dark:text-green-400" />
+                  ) : (
+                    <Circle className="h-5 w-5 shrink-0 text-neutral-400 dark:text-neutral-600" />
+                  )}
+                  <button
+                    type="button"
+                    aria-label="Edit session"
+                    onClick={() => setEditingSession(findSession(row.sessionId) ?? null)}
+                    className="rounded p-1 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Delete session"
+                    onClick={() => {
+                      setDeleteError(null);
+                      setSessionToDelete(findSession(row.sessionId) ?? null);
+                    }}
+                    className="rounded p-1 text-neutral-500 hover:bg-neutral-100 hover:text-red-600 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-red-400"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -118,6 +184,56 @@ export function ClimbDetail({
           onCancel={() => setIsFormOpen(false)}
           onSuccess={handleFormSuccess}
         />
+      )}
+
+      {editingSession && (
+        <SessionForm
+          editSession={{
+            climbId: climb.id,
+            sessionId: editingSession.id,
+            timestamp: editingSession.timestamp,
+            attempts: editingSession.attempts,
+            incline: editingSession.incline,
+            sent: editingSession.sent,
+          }}
+          onCancel={() => setEditingSession(null)}
+          onSuccess={handleFormSuccess}
+          onNotFound={handleFormNotFound}
+        />
+      )}
+
+      {sessionToDelete && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+          <div className="flex w-full flex-col gap-4 rounded-t-2xl bg-white p-6 shadow-xl sm:max-w-sm sm:rounded-2xl dark:bg-neutral-900">
+            <h2 className="text-lg font-semibold">Delete Session</h2>
+            <p className="text-sm text-neutral-600 dark:text-neutral-300">
+              Delete this session? This cannot be undone.
+            </p>
+            {deleteError && (
+              <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+                {deleteError}
+              </p>
+            )}
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setSessionToDelete(null)}
+                disabled={deleting}
+                className="rounded border border-neutral-400 px-4 py-2 text-sm hover:bg-neutral-100 dark:border-neutral-600 dark:hover:bg-neutral-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={deleting}
+                className="rounded-full bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
