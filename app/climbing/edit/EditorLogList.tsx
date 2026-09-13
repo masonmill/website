@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   buildEditorListData,
   formatAttempts,
@@ -8,6 +9,7 @@ import {
   type EditorSessionRow,
 } from "@/lib/climbingLog/editorList";
 import type { Log, SendLabel } from "@/lib/climbingLog/climbingLog";
+import { SessionForm } from "./SessionForm";
 
 // ─── Local (browser) day grouping ──────────────────────────────────────────
 //
@@ -64,7 +66,7 @@ function SessionRowView({ row }: { row: EditorSessionRow }) {
 
 // ─── Empty state ────────────────────────────────────────────────────────
 
-function EmptyState() {
+function EmptyState({ onLogSession }: { onLogSession: () => void }) {
   return (
     <div className="flex flex-col items-center gap-3 py-16 text-center">
       <h2 className="text-lg font-semibold">No Climbs</h2>
@@ -73,6 +75,7 @@ function EmptyState() {
       </p>
       <button
         type="button"
+        onClick={onLogSession}
         className="mt-2 rounded-full bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
       >
         Log Session
@@ -84,14 +87,50 @@ function EmptyState() {
 // ─── Main list ──────────────────────────────────────────────────────────
 
 export function EditorLogList({ log }: { log: Log }) {
+  const router = useRouter();
   const data = useMemo(() => buildEditorListData(log, localDayKey), [log]);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+
+  const climbOptions = useMemo(
+    () => log.climbs.map((c) => ({ name: c.name, board: c.board, grade: c.grade })),
+    [log]
+  );
+
+  function handleFormSuccess() {
+    setIsFormOpen(false);
+    router.refresh();
+  }
+
+  const form = isFormOpen && (
+    <SessionForm
+      climbs={climbOptions}
+      onCancel={() => setIsFormOpen(false)}
+      onSuccess={handleFormSuccess}
+    />
+  );
 
   if (log.climbs.length === 0) {
-    return <EmptyState />;
+    return (
+      <>
+        <EmptyState onLogSession={() => setIsFormOpen(true)} />
+        {form}
+      </>
+    );
   }
 
   return (
     <div className="flex flex-col gap-8">
+      {form}
+      <div className="flex items-center justify-end">
+        <button
+          type="button"
+          onClick={() => setIsFormOpen(true)}
+          aria-label="Log session"
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-900 text-lg font-medium text-white hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
+        >
+          +
+        </button>
+      </div>
       <div className="flex flex-col gap-6">
         {data.dayGroups.map((group) => (
           <div key={group.dayKey}>

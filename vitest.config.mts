@@ -8,6 +8,7 @@ export default defineConfig({
     // what Next's bundler does for genuine server-only imports.
     alias: {
       "server-only": new URL("./test/server-only-stub.ts", import.meta.url).pathname,
+      "@": new URL(".", import.meta.url).pathname,
     },
   },
   test: {
