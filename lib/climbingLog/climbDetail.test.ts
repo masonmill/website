@@ -3,7 +3,7 @@ import { buildClimbDetailRows, computeSendsCount } from "./climbDetail";
 import type { Session } from "./climbingLog";
 
 function makeSession(overrides: Partial<Session>): Session {
-  return { id: 0, timestamp: 0, attempts: 1, incline: 40, sent: false, ...overrides };
+  return { id: 0, timestamp: 0, attempts: 1, incline: 40, sent: false, location: "Planet Rock Ann Arbor", ...overrides };
 }
 
 describe("computeSendsCount", () => {

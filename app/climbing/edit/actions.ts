@@ -39,6 +39,7 @@ export interface LogSessionActionInput {
   attempts: number;
   incline: number;
   sent: boolean;
+  location: string;
   notes?: string;
 }
 
@@ -68,6 +69,7 @@ export interface AddSessionActionInput {
   attempts: number;
   incline: number;
   sent: boolean;
+  location: string;
   notes?: string;
 }
 
@@ -89,6 +91,7 @@ export async function addSessionAction(
       attempts: input.attempts,
       incline: input.incline,
       sent: input.sent,
+      location: input.location,
       notes: input.notes,
     })
   );
@@ -105,6 +108,7 @@ export interface EditSessionActionInput {
   attempts: number;
   incline: number;
   sent: boolean;
+  location: string;
   notes?: string;
 }
 
@@ -123,6 +127,7 @@ export async function editSessionAction(
       attempts: input.attempts,
       incline: input.incline,
       sent: input.sent,
+      location: input.location,
       notes: input.notes,
     })
   );

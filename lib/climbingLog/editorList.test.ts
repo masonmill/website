@@ -24,8 +24,8 @@ function makeLog(): Log {
         grade: "6a+/V3",
         nextSessionID: 2,
         sessions: [
-          { id: 0, timestamp: 1000000, attempts: 3, incline: 40, sent: false },
-          { id: 1, timestamp: 1000100, attempts: 1, incline: 40, sent: true },
+          { id: 0, timestamp: 1000000, attempts: 3, incline: 40, sent: false, location: "Planet Rock Ann Arbor" },
+          { id: 1, timestamp: 1000100, attempts: 1, incline: 40, sent: true, location: "Planet Rock Ann Arbor" },
         ],
       },
       {
@@ -35,7 +35,7 @@ function makeLog(): Log {
         grade: "6b/V4",
         nextSessionID: 1,
         sessions: [
-          { id: 0, timestamp: 1086500, attempts: 2, incline: 25, sent: true },
+          { id: 0, timestamp: 1086500, attempts: 2, incline: 25, sent: true, location: "Movement Long Island City" },
         ],
       },
       {

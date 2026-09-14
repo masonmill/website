@@ -251,6 +251,7 @@ export function ClimbDetail({
             attempts: editingSession.attempts,
             incline: editingSession.incline,
             sent: editingSession.sent,
+            location: editingSession.location,
             notes: editingSession.notes,
           }}
           onCancel={() => setEditingSession(null)}
@@ -264,7 +265,9 @@ export function ClimbDetail({
           <div className="flex w-full flex-col gap-4 rounded-t-2xl bg-white p-6 shadow-xl sm:max-w-sm sm:rounded-2xl dark:bg-neutral-900">
             <h2 className="text-lg font-semibold">Delete Session</h2>
             <p className="text-sm text-neutral-600 dark:text-neutral-300">
-              Delete this session? This cannot be undone.
+              {climb.sessions.length === 1
+                ? "This is the climb's last session — deleting it removes the whole climb. This cannot be undone."
+                : "Delete this session? This cannot be undone."}
             </p>
             {deleteError && (
               <p className="text-sm text-red-600 dark:text-red-400" role="alert">

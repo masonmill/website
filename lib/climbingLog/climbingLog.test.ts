@@ -46,6 +46,7 @@ test("logging a session under a new name creates a new climb", () => {
     attempts: 1,
     incline: 40,
     sent: false,
+    location: "Planet Rock Ann Arbor",
   });
   assert.equal(result.ok, true);
   if (!result.ok) return;
@@ -70,6 +71,7 @@ test("logging under an existing exact name+board adds a session and keeps grade"
     attempts: 3,
     incline: 25,
     sent: false,
+    location: "Planet Rock Ann Arbor",
   });
   assert.equal(result.ok, true);
   if (!result.ok) return;
@@ -91,6 +93,7 @@ test("logging with a different board creates a separate climb", () => {
     attempts: 1,
     incline: 40,
     sent: false,
+    location: "Planet Rock Ann Arbor",
   });
   assert.equal(result.ok, true);
   if (!result.ok) return;
@@ -108,6 +111,7 @@ test("logging with different letter case creates a separate climb", () => {
     attempts: 1,
     incline: 40,
     sent: false,
+    location: "Planet Rock Ann Arbor",
   });
   assert.equal(result.ok, true);
   if (!result.ok) return;
@@ -118,7 +122,7 @@ test("logging with different letter case creates a separate climb", () => {
 
 test("deleting a session leaves nextSessionID unchanged", () => {
   const log = mustParse(fixtureText);
-  const climb = log.climbs.find((c) => c.sessions.length >= 1)!;
+  const climb = log.climbs.find((c) => c.sessions.length >= 2)!;
   const sessionToDelete = climb.sessions[0];
   const prevNextSessionID = climb.nextSessionID;
 
@@ -137,10 +141,46 @@ test("deleting a session leaves nextSessionID unchanged", () => {
     attempts: 1,
     incline: 40,
     sent: false,
+    location: "Planet Rock Ann Arbor",
   });
   assert.equal(addResult.ok, true);
   if (!addResult.ok) return;
   assert.equal(addResult.value.sessionId, prevNextSessionID);
+});
+
+test("deleting a climb's only session removes the climb entirely", () => {
+  const log = mustParse(fixtureText);
+  const climb = log.climbs.find((c) => c.sessions.length === 1)!;
+
+  const result = deleteSession(log, climb.id, climb.sessions[0].id);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(
+    result.value.log.climbs.find((c) => c.id === climb.id),
+    undefined,
+  );
+  assert.equal(result.value.log.climbs.length, log.climbs.length - 1);
+});
+
+test("deleting a non-last session leaves the climb with its remaining sessions", () => {
+  const log = mustParse(fixtureText);
+  const climb = log.climbs.find((c) => c.sessions.length >= 2)!;
+  const sessionToDelete = climb.sessions[0];
+
+  const result = deleteSession(log, climb.id, sessionToDelete.id);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const afterDeleteClimb = result.value.log.climbs.find((c) => c.id === climb.id)!;
+  assert.equal(afterDeleteClimb.sessions.length, climb.sessions.length - 1);
+});
+
+test("parsing a climb with an empty sessions array throws a ClimbingLogError", () => {
+  const log = JSON.parse(fixtureText);
+  log.climbs[0].sessions = [];
+  const result = parseLog(JSON.stringify(log));
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.error.type, "validation");
 });
 
 // ─── Edit session / climb ────────────────────────────────────────────────
@@ -154,6 +194,7 @@ test("editing a session keeps its ID and re-sorts sessions by timestamp", () => 
     attempts: 5,
     incline: 40,
     sent: true,
+    location: "Planet Rock Ann Arbor",
   });
   assert.equal(result.ok, true);
   if (!result.ok) return;
@@ -197,6 +238,7 @@ test("empty name produces a validation error naming the field", () => {
     attempts: 1,
     incline: 40,
     sent: false,
+    location: "Planet Rock Ann Arbor",
   });
   assert.equal(result.ok, false);
   if (result.ok) return;
@@ -214,6 +256,7 @@ test("name over 255 chars produces a validation error", () => {
     attempts: 1,
     incline: 40,
     sent: false,
+    location: "Planet Rock Ann Arbor",
   });
   assert.equal(result.ok, false);
   if (result.ok) return;
@@ -230,6 +273,7 @@ test("attempts of 0 produces a validation error", () => {
     attempts: 0,
     incline: 40,
     sent: false,
+    location: "Planet Rock Ann Arbor",
   });
   assert.equal(result.ok, false);
   if (result.ok) return;
@@ -246,6 +290,7 @@ test("attempts of 1000 produces a validation error", () => {
     attempts: 1000,
     incline: 40,
     sent: false,
+    location: "Planet Rock Ann Arbor",
   });
   assert.equal(result.ok, false);
   if (result.ok) return;
@@ -262,6 +307,7 @@ test("incline of -1 produces a validation error", () => {
     attempts: 1,
     incline: -1,
     sent: false,
+    location: "Planet Rock Ann Arbor",
   });
   assert.equal(result.ok, false);
   if (result.ok) return;
@@ -278,6 +324,7 @@ test("incline of 71 produces a validation error", () => {
     attempts: 1,
     incline: 71,
     sent: false,
+    location: "Planet Rock Ann Arbor",
   });
   assert.equal(result.ok, false);
   if (result.ok) return;
@@ -294,6 +341,7 @@ test("incline of 40.5 produces a validation error", () => {
     attempts: 1,
     incline: 40.5,
     sent: false,
+    location: "Planet Rock Ann Arbor",
   });
   assert.equal(result.ok, false);
   if (result.ok) return;
@@ -310,6 +358,7 @@ test("unknown board produces a validation error naming the field", () => {
     attempts: 1,
     incline: 40,
     sent: false,
+    location: "Planet Rock Ann Arbor",
   });
   assert.equal(result.ok, false);
   if (result.ok) return;
@@ -326,10 +375,56 @@ test("unknown grade produces a validation error naming the field", () => {
     attempts: 1,
     incline: 40,
     sent: false,
+    location: "Planet Rock Ann Arbor",
   });
   assert.equal(result.ok, false);
   if (result.ok) return;
   assert.equal(result.error.field, "grade");
+});
+
+test("unknown location produces a validation error naming the field", () => {
+  const log = mustParse(fixtureText);
+  const result = logSession(log, {
+    name: "Whatever",
+    board: "MoonBoard 2019",
+    grade: "6a+/V3",
+    timestamp: 1,
+    attempts: 1,
+    incline: 40,
+    sent: false,
+    location: "Some Other Gym",
+  });
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.error.field, "location");
+});
+
+test("a session missing location fails to parse with a ClimbingLogError", () => {
+  const log = JSON.parse(fixtureText);
+  delete log.climbs[0].sessions[0].location;
+  const result = parseLog(JSON.stringify(log));
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.error.type, "validation");
+  assert.equal(result.error.field, "location");
+});
+
+test("parsing a serialized session round-trips location exactly", () => {
+  const log = mustParse(fixtureText);
+  const climb = log.climbs[0];
+  const result = addSession(log, climb.id, {
+    timestamp: 1,
+    attempts: 1,
+    incline: 40,
+    sent: false,
+    location: "Movement Long Island City",
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const reparsed = mustParse(serializeLog(result.value.log));
+  const updatedClimb = reparsed.climbs.find((c) => c.id === climb.id)!;
+  const newSession = updatedClimb.sessions.find((s) => s.id === result.value.sessionId)!;
+  assert.equal(newSession.location, "Movement Long Island City");
 });
 
 // ─── Not-found errors ────────────────────────────────────────────────────
@@ -341,6 +436,7 @@ test("unknown climb ID produces a not-found error", () => {
     attempts: 1,
     incline: 40,
     sent: false,
+    location: "Planet Rock Ann Arbor",
   });
   assert.equal(result.ok, false);
   if (result.ok) return;
@@ -355,6 +451,7 @@ test("unknown session ID produces a not-found error", () => {
     attempts: 1,
     incline: 40,
     sent: false,
+    location: "Planet Rock Ann Arbor",
   });
   assert.equal(result.ok, false);
   if (result.ok) return;
@@ -371,6 +468,7 @@ test("a session with notes serializes with notes as the last key", () => {
     attempts: 1,
     incline: 40,
     sent: false,
+    location: "Planet Rock Ann Arbor",
     notes: "Felt good today.",
   });
   assert.equal(result.ok, true);
@@ -382,7 +480,7 @@ test("a session with notes serializes with notes as the last key", () => {
   );
   assert.ok(sessionSnippetMatch, "expected session object with notes as last key");
   const keys = Object.keys(JSON.parse(sessionSnippetMatch![0]));
-  assert.deepEqual(keys, ["id", "timestamp", "attempts", "incline", "sent", "notes"]);
+  assert.deepEqual(keys, ["id", "timestamp", "attempts", "incline", "sent", "location", "notes"]);
 });
 
 test("whitespace-only notes are omitted from the session entirely", () => {
@@ -393,6 +491,7 @@ test("whitespace-only notes are omitted from the session entirely", () => {
     attempts: 1,
     incline: 40,
     sent: false,
+    location: "Planet Rock Ann Arbor",
     notes: "   ",
   });
   assert.equal(result.ok, true);
@@ -412,6 +511,7 @@ test("notes of exactly 280 code points is accepted", () => {
     attempts: 1,
     incline: 40,
     sent: false,
+    location: "Planet Rock Ann Arbor",
     notes,
   });
   assert.equal(result.ok, true);
@@ -431,6 +531,7 @@ test("notes of 281 code points is rejected with a validation error naming notes"
     attempts: 1,
     incline: 40,
     sent: false,
+    location: "Planet Rock Ann Arbor",
     notes,
   });
   assert.equal(result.ok, false);
@@ -447,6 +548,7 @@ test("editing a session to clear existing notes removes the notes key", () => {
     attempts: 1,
     incline: 40,
     sent: false,
+    location: "Planet Rock Ann Arbor",
     notes: "Original notes.",
   });
   assert.equal(addResult.ok, true);
@@ -457,6 +559,7 @@ test("editing a session to clear existing notes removes the notes key", () => {
     attempts: 1,
     incline: 40,
     sent: false,
+    location: "Planet Rock Ann Arbor",
     notes: "   ",
   });
   assert.equal(editResult.ok, true);

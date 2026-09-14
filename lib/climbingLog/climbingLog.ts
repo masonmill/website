@@ -11,12 +11,16 @@ export const BOARD_SHORT_NAMES: Record<Board, string> = {
 export const GRADES = ["6a+/V3", "6b/V4", "6c/V5", "7a/V6", "7a+/V7"] as const;
 export type Grade = (typeof GRADES)[number];
 
+export const LOCATIONS = ["Planet Rock Ann Arbor", "Movement Long Island City"] as const;
+export type Location = (typeof LOCATIONS)[number];
+
 export interface Session {
   id: number;
   timestamp: number;
   attempts: number;
   incline: number;
   sent: boolean;
+  location: Location;
   notes?: string;
 }
 
@@ -38,6 +42,9 @@ export interface Log {
 }
 
 export type SessionInput = Omit<Session, "id">;
+
+/** SessionInput before location has been validated against the closed enum. */
+export type SessionWriteInput = Omit<SessionInput, "location"> & { location: string };
 
 export type ClimbingLogError =
   | { type: "validation"; field: string; message: string }
@@ -119,6 +126,13 @@ function validateGrade(grade: string): Result<Grade> {
   return ok(grade as Grade);
 }
 
+function validateLocation(location: string): Result<Location> {
+  if (!(LOCATIONS as readonly string[]).includes(location)) {
+    return err(validationError("location", `Unknown location: ${location}`));
+  }
+  return ok(location as Location);
+}
+
 function validateTimestamp(timestamp: number): Result<number> {
   if (!Number.isInteger(timestamp)) {
     return err(validationError("timestamp", "Timestamp must be an integer."));
@@ -151,13 +165,15 @@ function validateNotes(notes: string | undefined): Result<string | undefined> {
   return ok(trimmed);
 }
 
-function validateSessionInput(input: SessionInput): Result<SessionInput> {
+function validateSessionInput(input: SessionWriteInput): Result<SessionInput> {
   const timestampResult = validateTimestamp(input.timestamp);
   if (!timestampResult.ok) return timestampResult;
   const attemptsResult = validateAttempts(input.attempts);
   if (!attemptsResult.ok) return attemptsResult;
   const inclineResult = validateIncline(input.incline);
   if (!inclineResult.ok) return inclineResult;
+  const locationResult = validateLocation(input.location);
+  if (!locationResult.ok) return locationResult;
   const notesResult = validateNotes(input.notes);
   if (!notesResult.ok) return notesResult;
   return ok({
@@ -165,6 +181,7 @@ function validateSessionInput(input: SessionInput): Result<SessionInput> {
     attempts: attemptsResult.value,
     incline: inclineResult.value,
     sent: input.sent,
+    location: locationResult.value,
     ...(notesResult.value !== undefined ? { notes: notesResult.value } : {}),
   });
 }
@@ -201,6 +218,11 @@ function parseSession(json: unknown, context: string): Result<Session> {
   if (typeof j.sent !== "boolean") {
     return err(validationError("sent", `${context}: missing or invalid sent.`));
   }
+  if (typeof j.location !== "string") {
+    return err(validationError("location", `${context}: missing or invalid location.`));
+  }
+  const locationResult = validateLocation(j.location);
+  if (!locationResult.ok) return locationResult;
   if (j.notes !== undefined && typeof j.notes !== "string") {
     return err(validationError("notes", `${context}: invalid notes.`));
   }
@@ -210,6 +232,7 @@ function parseSession(json: unknown, context: string): Result<Session> {
     attempts: j.attempts,
     incline: j.incline,
     sent: j.sent,
+    location: locationResult.value,
     ...(typeof j.notes === "string" ? { notes: j.notes } : {}),
   });
 }
@@ -246,6 +269,9 @@ function parseClimb(json: unknown): Result<Climb> {
     const sessionResult = parseSession(sessionJson, `climb "${j.name}"`);
     if (!sessionResult.ok) return sessionResult;
     sessions.push(sessionResult.value);
+  }
+  if (sessions.length === 0) {
+    return err(validationError("sessions", `Climb "${j.name}" has no sessions.`));
   }
   return ok({
     id: j.id,
@@ -296,6 +322,7 @@ function sessionToJson(session: Session) {
     attempts: session.attempts,
     incline: session.incline,
     sent: session.sent,
+    location: session.location,
     ...(session.notes !== undefined ? { notes: session.notes } : {}),
   };
 }
@@ -344,6 +371,7 @@ export function logSession(
     attempts: number;
     incline: number;
     sent: boolean;
+    location: string;
     notes?: string;
   },
 ): Result<OperationSuccess> {
@@ -392,7 +420,7 @@ export function logSession(
 }
 
 /** Adds a session to the given climb. */
-export function addSession(log: Log, climbId: number, input: SessionInput): Result<OperationSuccess> {
+export function addSession(log: Log, climbId: number, input: SessionWriteInput): Result<OperationSuccess> {
   const inputResult = validateSessionInput(input);
   if (!inputResult.ok) return inputResult;
 
@@ -420,7 +448,7 @@ export function addSession(log: Log, climbId: number, input: SessionInput): Resu
 }
 
 /** Replaces timestamp/attempts/incline/sent for an existing session. Its ID is unchanged. */
-export function editSession(log: Log, climbId: number, sessionId: number, input: SessionInput): Result<OperationSuccess> {
+export function editSession(log: Log, climbId: number, sessionId: number, input: SessionWriteInput): Result<OperationSuccess> {
   const inputResult = validateSessionInput(input);
   if (!inputResult.ok) return inputResult;
 
@@ -460,9 +488,15 @@ export function deleteSession(log: Log, climbId: number, sessionId: number): Res
     return err(notFoundError(`Session with id ${sessionId} not found on climb ${climbId}.`));
   }
   const sessions = climb.sessions.filter((s) => s.id !== sessionId);
-  const updatedClimb: Climb = { ...climb, sessions };
-  const climbs = [...log.climbs];
-  climbs[climbIndex] = updatedClimb;
+
+  const climbs =
+    sessions.length === 0
+      ? log.climbs.filter((_, i) => i !== climbIndex)
+      : (() => {
+          const updated = [...log.climbs];
+          updated[climbIndex] = { ...climb, sessions };
+          return updated;
+        })();
 
   return ok({
     log: { ...log, climbs },

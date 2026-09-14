@@ -146,6 +146,9 @@ export function EditorLogList({ log }: { log: Log }) {
     [log]
   );
 
+  const isLastSessionOfClimb = (row: EditorSessionRow) =>
+    log.climbs.find((c) => c.id === row.climbId)?.sessions.length === 1;
+
   function handleFormSuccess() {
     setIsFormOpen(false);
     router.refresh();
@@ -196,7 +199,9 @@ export function EditorLogList({ log }: { log: Log }) {
       <div className="flex w-full flex-col gap-4 rounded-t-2xl bg-white p-6 shadow-xl sm:max-w-sm sm:rounded-2xl dark:bg-neutral-900">
         <h2 className="text-lg font-semibold">Delete Session</h2>
         <p className="text-sm text-neutral-600 dark:text-neutral-300">
-          Delete this session for &quot;{sessionToDelete.name}&quot;? This cannot be undone.
+          {isLastSessionOfClimb(sessionToDelete)
+            ? `This is the last session for "${sessionToDelete.name}" — deleting it removes the whole climb. This cannot be undone.`
+            : `Delete this session for "${sessionToDelete.name}"? This cannot be undone.`}
         </p>
         {deleteError && (
           <p className="text-sm text-red-600 dark:text-red-400" role="alert">

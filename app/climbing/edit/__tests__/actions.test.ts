@@ -42,6 +42,7 @@ describe("logSessionAction", () => {
     attempts: 1,
     incline: 40,
     sent: false,
+    location: "Planet Rock Ann Arbor",
   };
 
   it("returns 401 and calls no GitHub operation when there is no session", async () => {
@@ -119,6 +120,7 @@ describe("addSessionAction", () => {
     attempts: 1,
     incline: 40,
     sent: false,
+    location: "Planet Rock Ann Arbor",
   };
 
   it("returns 401 and calls no GitHub operation when there is no session", async () => {
@@ -220,6 +222,7 @@ describe("editSessionAction", () => {
     attempts: 5,
     incline: 45,
     sent: true,
+    location: "Planet Rock Ann Arbor",
   };
 
   const existingLog = {
@@ -378,7 +381,7 @@ describe("deleteSessionAction", () => {
     };
     expect(opResult.ok).toBe(true);
     expect(opResult.value?.commitMessage).toBe("Delete session: Existing Problem");
-    expect(opResult.value?.log.climbs[0].sessions).toEqual([]);
+    expect(opResult.value?.log.climbs).toEqual([]);
 
     expect(result).toEqual({ ok: true, value: fakeSuccess });
   });

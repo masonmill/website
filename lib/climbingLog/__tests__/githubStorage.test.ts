@@ -47,8 +47,10 @@ describe("githubStorage", () => {
           name: "Échauffement",
           board: "MoonBoard 2019",
           grade: "6a+/V3",
-          nextSessionID: 0,
-          sessions: [],
+          nextSessionID: 1,
+          sessions: [
+            { id: 0, timestamp: 1000, attempts: 1, incline: 40, sent: true, location: "Planet Rock Ann Arbor" },
+          ],
         },
       ],
     };
@@ -72,8 +74,10 @@ describe("githubStorage", () => {
           name: "Existing",
           board: "MoonBoard 2019",
           grade: "6a+/V3",
-          nextSessionID: 0,
-          sessions: [],
+          nextSessionID: 1,
+          sessions: [
+            { id: 0, timestamp: 1000, attempts: 1, incline: 40, sent: true, location: "Planet Rock Ann Arbor" },
+          ],
         },
       ],
     };

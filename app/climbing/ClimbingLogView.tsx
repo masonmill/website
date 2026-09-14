@@ -14,6 +14,7 @@ export interface LogSession {
   attempts: number;
   incline: number;
   sent: boolean;
+  location: string;
   notes?: string;
 }
 
@@ -35,6 +36,7 @@ interface SessionRow {
   timestamp: number;
   attempts: number;
   incline: number;
+  location: string;
   // True if any session of this climb has been sent. Once a climb is sent,
   // earlier project attempts are no longer treated as projects.
   climbSent: boolean;
@@ -390,6 +392,7 @@ function flattenClimbs(climbs: LogClimb[]): SessionRow[] {
         timestamp: session.timestamp,
         attempts: session.attempts,
         incline: session.incline,
+        location: session.location,
         climbSent,
         label,
         notes: session.notes,
@@ -581,6 +584,7 @@ function ClimbHistory({ climb, activeSessionId }: { climb: LogClimb; activeSessi
                   <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">
                     <span>{session.attempts} attempt{session.attempts !== 1 ? "s" : ""}</span>
                     <span>{session.incline}°</span>
+                    <span>{session.location}</span>
                     <span className="w-16 text-right">
                       <span className={LABEL_STYLES[label]}>{label}</span>
                     </span>
@@ -772,6 +776,8 @@ export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null 
                                   <span>{row.incline}°</span>
                                   <span className="text-gray-300 dark:text-gray-600">·</span>
                                   <span>{row.attempts} attempt{row.attempts !== 1 ? "s" : ""}</span>
+                                  <span className="text-gray-300 dark:text-gray-600">·</span>
+                                  <span>{row.location}</span>
                                 </div>
                                 {hasNotes && notesExpanded && (
                                   <p

@@ -1,5 +1,6 @@
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { authorize } from "@/lib/auth/authorize";
 import { getOwnerGithubId, getSessionSecret } from "@/lib/auth/config";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/session";
@@ -45,5 +46,17 @@ export default async function EditLayout({
     );
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      <div className="mx-auto max-w-2xl px-8 pt-8">
+        <Link
+          href="/climbing"
+          className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+        >
+          ← climbing log
+        </Link>
+      </div>
+      {children}
+    </>
+  );
 }
