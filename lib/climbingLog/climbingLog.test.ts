@@ -427,6 +427,90 @@ test("parsing a serialized session round-trips location exactly", () => {
   assert.equal(newSession.location, "Movement Long Island City");
 });
 
+// ─── Location consistency across a day's sessions ───────────────────────
+
+test("adding a session with a different location than another climb the same day is rejected", () => {
+  const log = mustParse(fixtureText);
+  const arthritis = log.climbs.find((c) => c.name === "Arthritis")!;
+  const sameDayTimestamp = arthritis.sessions.find((s) => s.location === "Planet Rock Ann Arbor")!.timestamp;
+  const otherClimb = log.climbs.find((c) => c.name === "Magnus Bigtoe")!;
+
+  const result = addSession(log, otherClimb.id, {
+    timestamp: sameDayTimestamp,
+    attempts: 1,
+    incline: 40,
+    sent: false,
+    location: "Movement Long Island City",
+  });
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.error.type, "validation");
+  assert.equal(result.error.field, "location");
+});
+
+test("adding a session with the same location as another climb the same day succeeds", () => {
+  const log = mustParse(fixtureText);
+  const arthritis = log.climbs.find((c) => c.name === "Arthritis")!;
+  const sameDayTimestamp = arthritis.sessions.find((s) => s.location === "Planet Rock Ann Arbor")!.timestamp;
+  const otherClimb = log.climbs.find((c) => c.name === "Magnus Bigtoe")!;
+
+  const result = addSession(log, otherClimb.id, {
+    timestamp: sameDayTimestamp,
+    attempts: 1,
+    incline: 40,
+    sent: false,
+    location: "Planet Rock Ann Arbor",
+  });
+  assert.equal(result.ok, true);
+});
+
+test("editing a session to a location that conflicts with another climb the same day is rejected", () => {
+  const log = mustParse(fixtureText);
+  const arthritis = log.climbs.find((c) => c.name === "Arthritis")!;
+  const sessionToEdit = arthritis.sessions[0];
+
+  const result = editSession(log, arthritis.id, sessionToEdit.id, {
+    timestamp: sessionToEdit.timestamp,
+    attempts: sessionToEdit.attempts,
+    incline: sessionToEdit.incline,
+    sent: sessionToEdit.sent,
+    location: "Movement Long Island City",
+  });
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.error.field, "location");
+});
+
+test("editing a session without changing its location does not conflict with itself", () => {
+  const log = mustParse(fixtureText);
+  const arthritis = log.climbs.find((c) => c.name === "Arthritis")!;
+  const sessionToEdit = arthritis.sessions[0];
+
+  const result = editSession(log, arthritis.id, sessionToEdit.id, {
+    timestamp: sessionToEdit.timestamp,
+    attempts: 9,
+    incline: sessionToEdit.incline,
+    sent: sessionToEdit.sent,
+    location: sessionToEdit.location,
+  });
+  assert.equal(result.ok, true);
+});
+
+test("parsing a log with two different locations on the same day fails with a ClimbingLogError", () => {
+  const log = JSON.parse(fixtureText);
+  const arthritisSession = log.climbs.find((c: { name: string }) => c.name === "Arthritis").sessions[0];
+  const magnusSession = log.climbs.find((c: { name: string }) => c.name === "Magnus Bigtoe").sessions[0];
+  magnusSession.timestamp = arthritisSession.timestamp;
+  magnusSession.location = "Movement Long Island City";
+  arthritisSession.location = "Planet Rock Ann Arbor";
+
+  const result = parseLog(JSON.stringify(log));
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.error.type, "validation");
+  assert.equal(result.error.field, "location");
+});
+
 // ─── Not-found errors ────────────────────────────────────────────────────
 
 test("unknown climb ID produces a not-found error", () => {

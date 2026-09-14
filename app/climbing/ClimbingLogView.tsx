@@ -710,8 +710,11 @@ export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null 
               <motion.div className="flex flex-col gap-6 sm:gap-8" {...staggerList}>
                 {groups.map(([date, dayRows]) => (
                   <motion.div key={date} {...fadeUp}>
-                    <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-3">
-                      {date}
+                    <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-3">
+                      <span>{date}</span>
+                      <span className="text-gray-300 dark:text-gray-600 normal-case tracking-normal">
+                        · {LOCATION_SHORT_NAMES[dayRows[0].location] ?? dayRows[0].location}
+                      </span>
                     </p>
                     <div className="flex flex-col rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden">
                       {dayRows.map((row, i) => {
@@ -779,8 +782,6 @@ export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null 
                                   <span>{row.incline}°</span>
                                   <span className="text-gray-300 dark:text-gray-600">·</span>
                                   <span>{row.attempts} attempt{row.attempts !== 1 ? "s" : ""}</span>
-                                  <span className="text-gray-300 dark:text-gray-600">·</span>
-                                  <span>{LOCATION_SHORT_NAMES[row.location] ?? row.location}</span>
                                 </div>
                                 {hasNotes && notesExpanded && (
                                   <p

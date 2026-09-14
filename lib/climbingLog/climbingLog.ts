@@ -201,6 +201,59 @@ function findSessionIndex(climb: Climb, sessionId: number): number {
   return climb.sessions.findIndex((s) => s.id === sessionId);
 }
 
+// ─── Location consistency ───────────────────────────────────────────────
+//
+// A session's location represents one gym visit, and a visit can span
+// several climbs. All sessions logged on the same calendar day (UTC, so the
+// check is deterministic regardless of where it runs) must share the same
+// location.
+
+function sessionDayKey(timestamp: number): string {
+  const d = new Date(timestamp * 1000);
+  return `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`;
+}
+
+/**
+ * Finds a session elsewhere in the log on the same calendar day as
+ * `timestamp` whose location differs from `location`, if any. Pass
+ * `exclude` (the session being edited) so it doesn't conflict with itself.
+ */
+function findLocationConflict(
+  log: Log,
+  timestamp: number,
+  location: Location,
+  exclude?: { climbId: number; sessionId: number },
+): Session | undefined {
+  const day = sessionDayKey(timestamp);
+  for (const climb of log.climbs) {
+    for (const session of climb.sessions) {
+      if (exclude && climb.id === exclude.climbId && session.id === exclude.sessionId) continue;
+      if (session.location !== location && sessionDayKey(session.timestamp) === day) {
+        return session;
+      }
+    }
+  }
+  return undefined;
+}
+
+function validateLocationConsistency(
+  log: Log,
+  timestamp: number,
+  location: Location,
+  exclude?: { climbId: number; sessionId: number },
+): Result<Location> {
+  const conflict = findLocationConflict(log, timestamp, location, exclude);
+  if (conflict) {
+    return err(
+      validationError(
+        "location",
+        `Sessions logged the same day must share one location (already using "${conflict.location}").`,
+      ),
+    );
+  }
+  return ok(location);
+}
+
 // ─── Parsing ─────────────────────────────────────────────────────────────
 
 function parseSession(json: unknown, context: string): Result<Session> {
@@ -312,10 +365,25 @@ export function parseLog(text: string): Result<Log> {
     if (!climbResult.ok) return climbResult;
     climbs.push(climbResult.value);
   }
-  return ok({
-    nextClimbID: j.nextClimbID,
-    climbs: sortClimbsByName(climbs),
-  });
+  const parsedLog: Log = { nextClimbID: j.nextClimbID, climbs: sortClimbsByName(climbs) };
+  const dayLocations = new Map<string, Location>();
+  for (const climb of parsedLog.climbs) {
+    for (const session of climb.sessions) {
+      const day = sessionDayKey(session.timestamp);
+      const seen = dayLocations.get(day);
+      if (seen === undefined) {
+        dayLocations.set(day, session.location);
+      } else if (seen !== session.location) {
+        return err(
+          validationError(
+            "location",
+            `Sessions logged the same day must share one location: found both "${seen}" and "${session.location}".`,
+          ),
+        );
+      }
+    }
+  }
+  return ok(parsedLog);
 }
 
 // ─── Serialization ───────────────────────────────────────────────────────
@@ -433,6 +501,10 @@ export function addSession(log: Log, climbId: number, input: SessionWriteInput):
   if (climbIndex === -1) {
     return err(notFoundError(`Climb with id ${climbId} not found.`));
   }
+
+  const consistencyResult = validateLocationConsistency(log, inputResult.value.timestamp, inputResult.value.location);
+  if (!consistencyResult.ok) return consistencyResult;
+
   const climb = log.climbs[climbIndex];
   const sessionId = climb.nextSessionID;
   const newSession: Session = { id: sessionId, ...inputResult.value };
@@ -466,6 +538,13 @@ export function editSession(log: Log, climbId: number, sessionId: number, input:
   if (sessionIndex === -1) {
     return err(notFoundError(`Session with id ${sessionId} not found on climb ${climbId}.`));
   }
+
+  const consistencyResult = validateLocationConsistency(log, inputResult.value.timestamp, inputResult.value.location, {
+    climbId,
+    sessionId,
+  });
+  if (!consistencyResult.ok) return consistencyResult;
+
   const updatedSession: Session = { id: sessionId, ...inputResult.value };
   const sessions = [...climb.sessions];
   sessions[sessionIndex] = updatedSession;
