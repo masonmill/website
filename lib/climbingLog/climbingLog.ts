@@ -14,6 +14,11 @@ export type Grade = (typeof GRADES)[number];
 export const LOCATIONS = ["Planet Rock Ann Arbor", "Movement Long Island City"] as const;
 export type Location = (typeof LOCATIONS)[number];
 
+export const LOCATION_SHORT_NAMES: Record<Location, string> = {
+  "Planet Rock Ann Arbor": "Planet Rock AA",
+  "Movement Long Island City": "Movement LIC",
+};
+
 export interface Session {
   id: number;
   timestamp: number;

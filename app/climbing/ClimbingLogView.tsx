@@ -48,6 +48,11 @@ interface SessionRow {
 
 const GRADES = ["6a+/V3", "6b/V4", "6c/V5", "7a/V6", "7a+/V7"];
 
+const LOCATION_SHORT_NAMES: Record<string, string> = {
+  "Planet Rock Ann Arbor": "Planet Rock AA",
+  "Movement Long Island City": "Movement LIC",
+};
+
 const GRADE_COLORS: Record<string, string> = {
   "6a+/V3": "text-green-700  bg-green-50",
   "6b/V4":  "text-blue-700   bg-blue-50",
@@ -584,7 +589,7 @@ function ClimbHistory({ climb, activeSessionId }: { climb: LogClimb; activeSessi
                   <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">
                     <span>{session.attempts} attempt{session.attempts !== 1 ? "s" : ""}</span>
                     <span>{session.incline}°</span>
-                    <span>{session.location}</span>
+                    <span>{LOCATION_SHORT_NAMES[session.location] ?? session.location}</span>
                     <span className="w-16 text-right">
                       <span className={LABEL_STYLES[label]}>{label}</span>
                     </span>
@@ -777,7 +782,7 @@ export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null 
                                   <span className="text-gray-300 dark:text-gray-600">·</span>
                                   <span>{row.attempts} attempt{row.attempts !== 1 ? "s" : ""}</span>
                                   <span className="text-gray-300 dark:text-gray-600">·</span>
-                                  <span>{row.location}</span>
+                                  <span>{LOCATION_SHORT_NAMES[row.location] ?? row.location}</span>
                                 </div>
                                 {hasNotes && notesExpanded && (
                                   <p
