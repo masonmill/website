@@ -588,8 +588,6 @@ function ClimbHistory({ climb, activeSessionId }: { climb: LogClimb; activeSessi
                   </span>
                   <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">
                     <span>{session.attempts} attempt{session.attempts !== 1 ? "s" : ""}</span>
-                    <span>{session.incline}°</span>
-                    <span>{LOCATION_SHORT_NAMES[session.location] ?? session.location}</span>
                     <span className="w-16 text-right">
                       <span className={LABEL_STYLES[label]}>{label}</span>
                     </span>
