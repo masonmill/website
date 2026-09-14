@@ -34,7 +34,6 @@ export default function Home() {
           </h1>
         </div>
 
-        {/* Bio — three paragraphs, Citadel rejoined */}
         <motion.div
           className="text-lg sm:text-xl leading-relaxed flex flex-col gap-3 text-center sm:text-left"
           initial="hidden"
@@ -43,29 +42,14 @@ export default function Home() {
         >
           <FadeIn>
             <p>
-              I&apos;m Mason, a recent CS graduate from the University of
-              Michigan.
+              Hey! My name is Mason, and I am a recent computer science graduate
+              from the University of Michigan.
             </p>
           </FadeIn>
           <FadeIn>
             <p>
-              I&apos;m interested in storage systems, high-performance I/O,
-              distributed systems, and machine learning systems — primarily in
-              C++.
-            </p>
-          </FadeIn>
-          <FadeIn>
-            <p>
-              This summer, I&apos;m joining{" "}
-              <Link
-                href="https://www.citadel.com/"
-                className="brand-link text-blue-600 hover:underline"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Citadel
-              </Link>{" "}
-              as an intern in New York City.
+              I&apos;m broadly interested in the research and development of
+              performant, reliable, scalable, and maintainable software systems.
             </p>
           </FadeIn>
         </motion.div>
