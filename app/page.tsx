@@ -52,6 +52,12 @@ export default function Home() {
               performant, reliable, scalable, and maintainable software systems.
             </p>
           </FadeIn>
+          <FadeIn>
+            <p>
+              Outside of work, I enjoy rock climbing, playing drum set, and
+              reading.
+            </p>
+          </FadeIn>
         </motion.div>
 
         {/* Icons row — under bio, separated by a thin rule */}
