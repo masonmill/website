@@ -49,7 +49,11 @@ export default async function ClimbDetailPage({
 
   return (
     <main className="mx-auto flex w-full max-w-[760px] flex-1 flex-col px-6 pt-14 pb-20">
-      <ClimbDetail climb={climb} focusedSessionId={focusedSessionId} />
+      <ClimbDetail
+        climb={climb}
+        allClimbs={result.value.log.climbs.map((c) => ({ name: c.name, board: c.board, grade: c.grade }))}
+        focusedSessionId={focusedSessionId}
+      />
     </main>
   );
 }

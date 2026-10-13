@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import SiteChrome from "../SiteChrome";
-import { BoardLogo, GRADE_COLORS, GradeTag, LABEL_STYLES, SendLabelPill } from "./styles";
+import { BoardLogo, BoardTag, GRADE_COLORS, GradeTag, InclineTag, LABEL_STYLES, SendLabelPill } from "./styles";
 import {
   BOARDS,
   BOARD_SHORT_NAMES,
@@ -393,11 +393,8 @@ function SessionRowView({
           </div>
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px] text-[#737373]">
             <GradeTag grade={climb.grade} />
-            <span className="flex items-center gap-1.5">
-              <BoardLogo board={climb.board} />
-              {boardShort(climb.board)}
-            </span>
-            <span>{session.incline}°</span>
+            <BoardTag board={climb.board} short={boardShort(climb.board)} />
+            <InclineTag incline={session.incline} />
             <span>{plural(session.attempts, "attempt")}</span>
           </div>
           {notesOpen && (

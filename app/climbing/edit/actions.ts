@@ -5,12 +5,17 @@ import { authorize } from "@/lib/auth/authorize";
 import { getOwnerGithubId, getSessionSecret } from "@/lib/auth/config";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/session";
 import { applyLogOperation, type GitHubStorageError } from "@/lib/climbingLog/githubStorage";
-import { addSession, deleteSession, editClimb, editSession, logSession, type OperationSuccess } from "@/lib/climbingLog/climbingLog";
+import {
+  deleteSession,
+  editClimb,
+  editSession,
+  logSessions,
+  type OperationSuccess,
+} from "@/lib/climbingLog/climbingLog";
 
 // ─── Shared result shape ────────────────────────────────────────────────
 //
-// Every write action in this file (logSessionAction, addSessionAction,
-// editSessionAction, deleteSessionAction, editClimbAction) returns one of
+// Every write action in this file (logSessionsAction, editSessionAction, deleteSessionAction, editClimbAction) returns one of
 // these three outcomes so the client form code can handle them uniformly.
 
 export type ActionResult<T> =
@@ -44,57 +49,20 @@ export interface LogSessionActionInput {
 }
 
 /**
- * Logs a new session, creating the climb first if none with the same
- * trimmed name and board already exists. Used by the "New Session" form
- * opened from the main editor list.
+ * Logs several climbs from one gym visit in a single commit. Used by the
+ * "New Session" form, which collects climbs one by one before saving them
+ * together. A climb matching an existing name and board gets a new session
+ * on that climb; otherwise the climb is created.
  */
-export async function logSessionAction(
-  input: LogSessionActionInput
+export async function logSessionsAction(
+  inputs: LogSessionActionInput[]
 ): Promise<ActionResult<OperationSuccess>> {
   const auth = await requireOwner();
   if (!auth.ok) {
     return { ok: false, kind: "unauthorized", status: auth.status };
   }
 
-  const result = await applyLogOperation((log) => logSession(log, input));
-  if (!result.ok) {
-    return { ok: false, kind: "storage", error: result.error };
-  }
-  return { ok: true, value: result.value };
-}
-
-export interface AddSessionActionInput {
-  climbId: number;
-  timestamp: number;
-  attempts: number;
-  incline: number;
-  sent: boolean;
-  location: string;
-  notes?: string;
-}
-
-/**
- * Adds a session to an already-known climb. Used by the "New Session" form
- * opened from a climb's detail page, where the Problem section is omitted.
- */
-export async function addSessionAction(
-  input: AddSessionActionInput
-): Promise<ActionResult<OperationSuccess>> {
-  const auth = await requireOwner();
-  if (!auth.ok) {
-    return { ok: false, kind: "unauthorized", status: auth.status };
-  }
-
-  const result = await applyLogOperation((log) =>
-    addSession(log, input.climbId, {
-      timestamp: input.timestamp,
-      attempts: input.attempts,
-      incline: input.incline,
-      sent: input.sent,
-      location: input.location,
-      notes: input.notes,
-    })
-  );
+  const result = await applyLogOperation((log) => logSessions(log, inputs));
   if (!result.ok) {
     return { ok: false, kind: "storage", error: result.error };
   }

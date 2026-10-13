@@ -516,6 +516,35 @@ export function logSession(
   });
 }
 
+/**
+ * Logs several sessions at once (one gym visit with multiple climbs), as a
+ * single operation and therefore a single commit. Each entry is applied with
+ * `logSession` in order, so a later entry can add to a climb an earlier
+ * entry created. If any entry is invalid, nothing is logged.
+ */
+export function logSessions(
+  log: Log,
+  inputs: Parameters<typeof logSession>[1][],
+): Result<OperationSuccess> {
+  if (inputs.length === 0) return err(validationError("climbs", "Add at least one climb."));
+
+  let workingLog = log;
+  let last: OperationSuccess | undefined;
+  for (const input of inputs) {
+    const result = logSession(workingLog, input);
+    if (!result.ok) return result;
+    workingLog = result.value.log;
+    last = result.value;
+  }
+
+  const names = [...new Set(inputs.map((i) => i.name.trim()))];
+  return ok({
+    ...last!,
+    commitMessage:
+      inputs.length === 1 ? last!.commitMessage : `Log session: ${inputs.length} climbs (${names.join(", ")})`,
+  });
+}
+
 /** Adds a session to the given climb. */
 export function addSession(log: Log, climbId: number, input: SessionWriteInput): Result<OperationSuccess> {
   const inputResult = validateSessionInput(input);

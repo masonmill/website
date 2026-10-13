@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeEditedSessionTimestamp, computeNewSessionTimestamp, toDateInputValue } from "./timestamp";
+import { computeBatchSessionTimestamps, computeEditedSessionTimestamp, computeNewSessionTimestamp, toDateInputValue } from "./timestamp";
 
 describe("computeNewSessionTimestamp", () => {
   it("combines the chosen date with now's local time of day", () => {
@@ -20,6 +20,20 @@ describe("computeNewSessionTimestamp", () => {
 
   it("throws on a malformed date string", () => {
     expect(() => computeNewSessionTimestamp("not-a-date", new Date())).toThrow();
+  });
+});
+
+describe("computeBatchSessionTimestamps", () => {
+  it("steps forward one second per entry from now's time of day", () => {
+    const now = new Date(2024, 2, 10, 14, 30, 5);
+    const base = Math.floor(new Date(2024, 0, 5, 14, 30, 5).getTime() / 1000);
+    expect(computeBatchSessionTimestamps("2024-01-05", now, 3)).toEqual([base, base + 1, base + 2]);
+  });
+
+  it("steps backward instead when stepping forward would cross into the next day", () => {
+    const now = new Date(2024, 2, 10, 23, 59, 59);
+    const base = Math.floor(new Date(2024, 0, 5, 23, 59, 59).getTime() / 1000);
+    expect(computeBatchSessionTimestamps("2024-01-05", now, 3)).toEqual([base - 2, base - 1, base]);
   });
 });
 

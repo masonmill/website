@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { BOARDS, BOARD_SHORT_NAMES, GRADES, type Board, type Grade } from "@/lib/climbingLog/climbingLog";
-import { editClimbAction, type ActionResult } from "./actions";
-import type { OperationSuccess } from "@/lib/climbingLog/climbingLog";
+import { errorMessage, isNotFound } from "./actionErrors";
+import { editClimbAction } from "./actions";
 import { BoardLogo, GRADE_COLORS } from "../styles";
 import { Chip, Dialog, ErrorText, FieldLabel, inputClass, primaryButton, secondaryButton } from "./ui";
 
@@ -24,19 +24,6 @@ export interface ClimbFormProps {
    * The caller should reload the latest data and close the form.
    */
   onNotFound?: () => void;
-}
-
-function errorMessage(result: Extract<ActionResult<OperationSuccess>, { ok: false }>): string {
-  if (result.kind === "unauthorized") {
-    return result.status === 401
-      ? "You need to sign in again to make changes."
-      : "This account doesn't have access to edit the log.";
-  }
-  return result.error.message;
-}
-
-function isNotFound(result: Extract<ActionResult<OperationSuccess>, { ok: false }>): boolean {
-  return result.kind === "storage" && result.error.type === "not-found";
 }
 
 export function ClimbForm({ climb, onCancel, onSuccess, onNotFound }: ClimbFormProps) {

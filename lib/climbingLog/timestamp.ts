@@ -31,6 +31,20 @@ export function computeNewSessionTimestamp(dateString: string, now: Date): numbe
 }
 
 /**
+ * Timestamps for `count` sessions logged together on one date: one second
+ * apart, in entry order, so they keep that order within the day. They step
+ * forward from now's time of day, or backward if stepping forward would
+ * spill into the next day.
+ */
+export function computeBatchSessionTimestamps(dateString: string, now: Date, count: number): number[] {
+  const base = computeNewSessionTimestamp(dateString, now);
+  const [y, m, d] = dateString.split("-").map(Number);
+  const nextDayStart = Math.floor(new Date(y, m - 1, d + 1).getTime() / 1000);
+  const start = base + count - 1 < nextDayStart ? base : base - (count - 1);
+  return Array.from({ length: count }, (_, i) => start + i);
+}
+
+/**
  * Combines a date-only string with the original session timestamp's local
  * time-of-day, returning the result as Unix epoch seconds.
  *

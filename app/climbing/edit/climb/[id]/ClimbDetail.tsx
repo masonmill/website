@@ -13,8 +13,9 @@ import {
   type Climb,
   type Session,
 } from "@/lib/climbingLog/climbingLog";
-import { BoardLogo, GradeTag, SendLabelPill } from "../../../styles";
-import { SessionForm } from "../../SessionForm";
+import { BoardLogo, GradeTag, InclineTag, SendLabelPill } from "../../../styles";
+import { SessionForm, type SessionFormClimbOption } from "../../SessionForm";
+import { EditSessionForm } from "../../EditSessionForm";
 import { ClimbForm } from "../../ClimbForm";
 import { deleteSessionAction } from "../../actions";
 import { Dialog, ErrorText, dangerButton, iconButton, primaryButton, secondaryButton } from "../../ui";
@@ -30,9 +31,12 @@ function formatDayLabel(timestampSeconds: number): string {
 
 export function ClimbDetail({
   climb,
+  allClimbs,
   focusedSessionId,
 }: {
   climb: Climb;
+  /** Every climb in the log, for name autocomplete when logging a session. */
+  allClimbs: SessionFormClimbOption[];
   focusedSessionId?: number;
 }) {
   const router = useRouter();
@@ -160,7 +164,7 @@ export function ClimbDetail({
 
       <section className="flex flex-col">
         <h2 className="pb-2 text-[15px] font-semibold">
-          Sessions <span className="mono text-[13px] font-normal text-[#a3a3a3]">{rows.length}</span>
+          Sessions
         </h2>
         {rows.length === 0 ? (
           <p className="py-8 text-[#737373]">No sessions yet.</p>
@@ -180,29 +184,32 @@ export function ClimbDetail({
                   <div className="flex min-w-0 flex-1 flex-col gap-1">
                     <span className="text-base font-medium">{formatDayLabel(row.timestamp)}</span>
                     <span className="flex flex-wrap items-center gap-x-2.5 text-[13px] text-[#737373]">
+                      <InclineTag incline={row.incline} />
+                      <span>{formatAttempts(row.attempts)}</span>
                       {session && (
                         <span className="mono text-xs">
                           {LOCATION_SHORT_NAMES[session.location] ?? session.location}
                         </span>
                       )}
-                      <span>{row.incline}°</span>
-                      <span>{formatAttempts(row.attempts)}</span>
                     </span>
                   </div>
+                  {hasNotes ? (
+                    <button
+                      type="button"
+                      aria-label={notesExpanded ? "Hide notes" : "Show notes"}
+                      onClick={() =>
+                        setExpandedNotesId((prev) => (prev === row.sessionId ? null : row.sessionId))
+                      }
+                      className={`${iconButton} ${notesExpanded ? "text-[#0a0a0a]" : ""}`}
+                    >
+                      <StickyNote className="size-4" />
+                    </button>
+                  ) : (
+                    // Keeps the slot so labels line up with rows that have notes.
+                    <span aria-hidden className="size-8 shrink-0" />
+                  )}
                   <SendLabelPill label={labelFor(row.sessionId)} />
                   <div className="flex items-center">
-                    {hasNotes && (
-                      <button
-                        type="button"
-                        aria-label={notesExpanded ? "Hide notes" : "Show notes"}
-                        onClick={() =>
-                          setExpandedNotesId((prev) => (prev === row.sessionId ? null : row.sessionId))
-                        }
-                        className={`${iconButton} ${notesExpanded ? "text-[#0a0a0a]" : ""}`}
-                      >
-                        <StickyNote className="size-4" />
-                      </button>
-                    )}
                     <button
                       type="button"
                       aria-label="Edit session"
@@ -235,7 +242,8 @@ export function ClimbDetail({
 
       {isFormOpen && (
         <SessionForm
-          fixedClimb={{ id: climb.id, name: climb.name, board: climb.board, grade: climb.grade }}
+          climbs={allClimbs}
+          initialClimb={{ name: climb.name, board: climb.board, grade: climb.grade }}
           onCancel={() => setIsFormOpen(false)}
           onSuccess={handleFormSuccess}
         />
@@ -251,8 +259,8 @@ export function ClimbDetail({
       )}
 
       {editingSession && (
-        <SessionForm
-          editSession={{
+        <EditSessionForm
+          session={{
             climbId: climb.id,
             sessionId: editingSession.id,
             timestamp: editingSession.timestamp,

@@ -6,8 +6,8 @@ export default function Home() {
   return (
     <SiteChrome>
       <main className="mx-auto flex w-full max-w-[1040px] flex-1 flex-col gap-24 px-6 pt-[88px] pb-24">
-        <section className="flex flex-wrap items-center gap-14">
-          <div className="reveal flex min-w-0 flex-[1_1_440px] flex-col gap-7">
+        <section className="flex flex-col gap-10 md:flex-row md:items-center md:gap-14">
+          <div className="reveal flex min-w-0 flex-col gap-7 md:flex-[1_1_440px]">
             <div className="flex flex-col gap-3.5">
               <span className="mono text-[13px] tracking-[0.02em] text-[#737373]">
                 Software Engineer · Apple
@@ -57,7 +57,7 @@ export default function Home() {
             </div>
           </div>
           <div
-            className="reveal min-w-[240px] flex-[0_1_320px]"
+            className="reveal order-first w-full max-w-[320px] md:order-none md:max-w-none md:min-w-[240px] md:flex-[0_1_320px]"
             style={{ animationDuration: "900ms", animationDelay: "120ms" }}
           >
             <Image

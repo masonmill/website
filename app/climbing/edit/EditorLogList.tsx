@@ -11,7 +11,7 @@ import {
   type EditorSessionRow,
 } from "@/lib/climbingLog/editorList";
 import { LOCATION_SHORT_NAMES, type Log } from "@/lib/climbingLog/climbingLog";
-import { BoardLogo, GradeTag, SendLabelPill } from "../styles";
+import { BoardTag, GradeTag, InclineTag, SendLabelPill } from "../styles";
 import { SessionForm } from "./SessionForm";
 import { deleteSessionAction } from "./actions";
 import { Dialog, ErrorText, dangerButton, iconButton, primaryButton, secondaryButton } from "./ui";
@@ -52,23 +52,19 @@ function SessionRowView({
       <div className="flex items-center gap-1 pr-1.5">
         <Link
           href={`/climbing/edit/climb/${row.climbId}?session=${row.sessionId}`}
-          className="flex min-w-0 flex-1 items-center justify-between gap-3 p-3"
+          className="flex min-w-0 flex-1 items-center p-3"
         >
           <div className="flex min-w-0 flex-col gap-1">
             <span className="truncate text-base font-medium">{row.name}</span>
             <span className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[13px] text-[#737373]">
               <GradeTag grade={row.grade} />
-              <span className="flex items-center gap-1.5">
-                <BoardLogo board={row.board} />
-                {row.boardShort}
-              </span>
-              <span>{row.incline}°</span>
+              <BoardTag board={row.board} short={row.boardShort} />
+              <InclineTag incline={row.incline} />
               <span>{formatAttempts(row.attempts)}</span>
             </span>
           </div>
-          <SendLabelPill label={row.label} />
         </Link>
-        {hasNotes && (
+        {hasNotes ? (
           <button
             type="button"
             aria-label={notesExpanded ? "Hide notes" : "Show notes"}
@@ -77,7 +73,13 @@ function SessionRowView({
           >
             <StickyNote className="size-4" />
           </button>
+        ) : (
+          // Keeps the slot so labels line up with rows that have notes.
+          <span aria-hidden className="size-8 shrink-0" />
         )}
+        <span className="mx-1.5">
+          <SendLabelPill label={row.label} />
+        </span>
         <button
           type="button"
           aria-label="Delete session"
@@ -264,10 +266,7 @@ export function EditorLogList({ log }: { log: Log }) {
                     <span className="truncate text-base font-medium">{climb.name}</span>
                     <span className="flex items-center gap-2.5 text-[13px] text-[#737373]">
                       <GradeTag grade={climb.grade} />
-                      <span className="flex items-center gap-1.5">
-                        <BoardLogo board={climb.board} />
-                        {climb.boardShort}
-                      </span>
+                      <BoardTag board={climb.board} short={climb.boardShort} />
                     </span>
                   </Link>
                 ))}

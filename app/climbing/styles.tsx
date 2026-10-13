@@ -47,11 +47,26 @@ export function GradeTag({ grade }: { grade: string }) {
   );
 }
 
+// Board, incline and label get fixed widths too, so every column in a row's
+// metadata lines up across rows, within a day and across days.
+export function BoardTag({ board, short }: { board: string; short: string }) {
+  return (
+    <span className="flex min-w-[88px] items-center gap-1.5">
+      <BoardLogo board={board} />
+      {short}
+    </span>
+  );
+}
+
+export function InclineTag({ incline }: { incline: number }) {
+  return <span className="min-w-[28px] tabular-nums">{incline}°</span>;
+}
+
 export function SendLabelPill({ label }: { label: SendLabel }) {
   const s = LABEL_STYLES[label];
   return (
     <span
-      className="shrink-0 rounded-full border px-2.5 py-[3px] text-xs font-semibold"
+      className="flex w-20 shrink-0 justify-center rounded-full border py-[3px] text-xs font-semibold"
       style={{ color: s.color, background: s.bg, borderColor: s.border }}
     >
       {label}

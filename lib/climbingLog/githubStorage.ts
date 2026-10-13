@@ -67,7 +67,11 @@ export async function readLog(
   let res: Response;
   try {
     res = await fetch(contentsUrl(), {
-      ...(mode === "fresh" ? { cache: "no-store" as const } : { next: { revalidate: false } }),
+      ...(mode === "fresh"
+        ? { cache: "no-store" as const }
+        : // In dev, edits made on the live site never revalidate the local
+          // Data Cache (it persists in .next/cache), so expire it after 30s.
+          { next: { revalidate: process.env.NODE_ENV === "development" ? 30 : false } }),
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: "application/vnd.github+json",

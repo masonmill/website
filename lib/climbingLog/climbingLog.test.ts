@@ -6,6 +6,7 @@ import {
   parseLog,
   serializeLog,
   logSession,
+  logSessions,
   addSession,
   editSession,
   deleteSession,
@@ -31,6 +32,60 @@ test("parsing and serializing the fixture reproduces it byte for byte", () => {
   const log = mustParse(fixtureText);
   const serialized = serializeLog(log);
   assert.equal(serialized, fixtureText);
+});
+
+// ─── Log sessions (batch) ──────────────────────────────────────────────────
+
+const batchEntry = (name: string, timestamp: number) => ({
+  name,
+  board: "MoonBoard 2019",
+  grade: "6a+/V3",
+  timestamp,
+  attempts: 2,
+  incline: 40,
+  sent: true,
+  location: "Planet Rock Ann Arbor",
+});
+
+test("logging a batch adds every climb in one operation with a combined commit message", () => {
+  const log = mustParse(fixtureText);
+  const result = logSessions(log, [batchEntry("Batch A", 1000), batchEntry("Batch B", 1001)]);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.value.log.climbs.length, log.climbs.length + 2);
+  assert.equal(result.value.log.nextClimbID, log.nextClimbID + 2);
+  assert.equal(result.value.commitMessage, "Log session: 2 climbs (Batch A, Batch B)");
+});
+
+test("a later batch entry with the same name+board adds to the climb an earlier entry created", () => {
+  const log = mustParse(fixtureText);
+  const result = logSessions(log, [batchEntry("Batch A", 1000), batchEntry("Batch A", 1001)]);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const climb = result.value.log.climbs.find((c) => c.name === "Batch A")!;
+  assert.deepEqual(climb.sessions.map((s) => s.id), [0, 1]);
+  assert.equal(result.value.log.nextClimbID, log.nextClimbID + 1);
+  assert.equal(result.value.commitMessage, "Log session: 2 climbs (Batch A)");
+});
+
+test("a one-climb batch uses the single-session commit message", () => {
+  const log = mustParse(fixtureText);
+  const result = logSessions(log, [batchEntry("Solo", 1000)]);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.value.commitMessage, "Log session: Solo");
+});
+
+test("an invalid entry fails the whole batch", () => {
+  const log = mustParse(fixtureText);
+  const result = logSessions(log, [batchEntry("Fine", 1000), { ...batchEntry("Bad", 1001), attempts: 0 }]);
+  assert.equal(result.ok, false);
+});
+
+test("an empty batch is rejected", () => {
+  const log = mustParse(fixtureText);
+  const result = logSessions(log, []);
+  assert.equal(result.ok, false);
 });
 
 // ─── Log session ─────────────────────────────────────────────────────────
