@@ -5,7 +5,13 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ChevronDown, StickyNote } from "lucide-react";
-import { GRADES, LOCATION_SHORT_NAMES as LIB_LOCATION_SHORT_NAMES } from "@/lib/climbingLog/climbingLog";
+import {
+  BOARDS,
+  BOARD_SHORT_NAMES,
+  GRADES,
+  LOCATIONS,
+  LOCATION_SHORT_NAMES as LIB_LOCATION_SHORT_NAMES,
+} from "@/lib/climbingLog/climbingLog";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -472,16 +478,73 @@ const LABEL_STYLES: Record<SendLabel, string> = {
 
 // ─── Filter Bar ───────────────────────────────────────────────────────────────
 
+const PILL_ACTIVE = "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900";
+const PILL_INACTIVE =
+  "bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700";
+
+// A row of single-select pills with an "all" option. Hidden when there is
+// only one value to choose from, since filtering would be a no-op.
+function OptionPills({
+  allLabel,
+  options,
+  selected,
+  onChange,
+  label,
+}: {
+  allLabel: string;
+  options: string[];
+  selected: string;
+  onChange: (v: string) => void;
+  label: (v: string) => string;
+}) {
+  if (options.length < 2) return null;
+  return (
+    <div className="flex flex-wrap gap-2">
+      <button
+        onClick={() => onChange("all")}
+        className={`text-xs font-medium px-2.5 py-1 rounded-full transition-colors ${
+          selected === "all" ? PILL_ACTIVE : PILL_INACTIVE
+        }`}
+      >
+        {allLabel}
+      </button>
+      {options.map((o) => (
+        <button
+          key={o}
+          onClick={() => onChange(o === selected ? "all" : o)}
+          className={`text-xs font-medium px-2.5 py-1 rounded-full transition-colors ${
+            o === selected ? PILL_ACTIVE : PILL_INACTIVE
+          }`}
+        >
+          {label(o)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function FilterBar({
   grades,
   selectedGrade,
   onGradeChange,
+  boards,
+  selectedBoard,
+  onBoardChange,
+  locations,
+  selectedLocation,
+  onLocationChange,
   status,
   onStatusChange,
 }: {
   grades: string[];
   selectedGrade: string;
   onGradeChange: (g: string) => void;
+  boards: string[];
+  selectedBoard: string;
+  onBoardChange: (b: string) => void;
+  locations: string[];
+  selectedLocation: string;
+  onLocationChange: (l: string) => void;
   status: StatusFilter;
   onStatusChange: (s: StatusFilter) => void;
 }) {
@@ -513,6 +576,22 @@ function FilterBar({
           </button>
         ))}
       </div>
+
+      <OptionPills
+        allLabel="All Boards"
+        options={boards}
+        selected={selectedBoard}
+        onChange={onBoardChange}
+        label={(b) => BOARD_SHORT_NAMES[b as keyof typeof BOARD_SHORT_NAMES] ?? b}
+      />
+
+      <OptionPills
+        allLabel="All Gyms"
+        options={locations}
+        selected={selectedLocation}
+        onChange={onLocationChange}
+        label={(l) => LOCATION_SHORT_NAMES[l] ?? l}
+      />
 
       {/* Status pills */}
       <div className="flex flex-wrap gap-2">
@@ -606,6 +685,8 @@ function ClimbHistory({ climb, activeSessionId }: { climb: LogClimb; activeSessi
 
 export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null }) {
   const [gradeFilter, setGradeFilter] = useState<string>("all");
+  const [boardFilter, setBoardFilter] = useState<string>("all");
+  const [locationFilter, setLocationFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [expandedClimb, setExpandedClimb] = useState<string | null>(null);
   const [expandedNotesKey, setExpandedNotesKey] = useState<string | null>(null);
@@ -625,6 +706,19 @@ export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null 
     return GRADES.filter((g) => gradeSet.has(g));
   }, [climbs]);
 
+  // Available boards and locations in the data, in canonical order.
+  const availableBoards = useMemo(() => {
+    if (!climbs) return [];
+    const boardSet = new Set(climbs.map((c) => c.board));
+    return BOARDS.filter((b) => boardSet.has(b));
+  }, [climbs]);
+
+  const availableLocations = useMemo(() => {
+    if (!climbs) return [];
+    const locationSet = new Set(climbs.flatMap((c) => c.sessions.map((s) => s.location)));
+    return LOCATIONS.filter((l) => locationSet.has(l));
+  }, [climbs]);
+
   // Flatten + sort once when climbs change (not on every filter toggle).
   const allRows = useMemo(() => {
     if (!climbs) return [];
@@ -637,13 +731,19 @@ export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null 
     if (gradeFilter !== "all") {
       rows = rows.filter((r) => r.grade === gradeFilter);
     }
+    if (boardFilter !== "all") {
+      rows = rows.filter((r) => r.board === boardFilter);
+    }
+    if (locationFilter !== "all") {
+      rows = rows.filter((r) => r.location === locationFilter);
+    }
     if (statusFilter === "sent") {
       rows = rows.filter((r) => r.climbSent);
     } else if (statusFilter === "project") {
       rows = rows.filter((r) => !r.climbSent);
     }
     return rows;
-  }, [allRows, gradeFilter, statusFilter]);
+  }, [allRows, gradeFilter, boardFilter, locationFilter, statusFilter]);
 
   const groups = useMemo(() => groupByDate(filtered), [filtered]);
 
@@ -689,6 +789,12 @@ export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null 
                 grades={availableGrades}
                 selectedGrade={gradeFilter}
                 onGradeChange={setGradeFilter}
+                boards={availableBoards}
+                selectedBoard={boardFilter}
+                onBoardChange={setBoardFilter}
+                locations={availableLocations}
+                selectedLocation={locationFilter}
+                onLocationChange={setLocationFilter}
                 status={statusFilter}
                 onStatusChange={setStatusFilter}
               />
