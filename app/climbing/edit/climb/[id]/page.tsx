@@ -20,9 +20,9 @@ export default async function ClimbDetailPage({
 
   if (!result.ok) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center gap-4 p-8 text-center">
-        <h1 className="text-2xl font-semibold">Couldn&apos;t load the log</h1>
-        <p className="text-neutral-500 dark:text-neutral-400">{result.error.message}</p>
+      <main className="mx-auto flex max-w-[760px] flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
+        <h1 className="text-[28px] font-semibold tracking-[-0.03em]">Couldn&apos;t load the log</h1>
+        <p className="text-[#737373]">{result.error.message}</p>
         <Link href="/climbing/edit" className="text-sm underline">
           Back to log
         </Link>
@@ -36,8 +36,8 @@ export default async function ClimbDetailPage({
 
   if (!climb) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center gap-4 p-8 text-center">
-        <h1 className="text-2xl font-semibold">Climb not found</h1>
+      <main className="mx-auto flex max-w-[760px] flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
+        <h1 className="text-[28px] font-semibold tracking-[-0.03em]">Climb not found</h1>
         <Link href="/climbing/edit" className="text-sm underline">
           Back to log
         </Link>
@@ -48,7 +48,7 @@ export default async function ClimbDetailPage({
   const focusedSessionId = session !== undefined ? Number(session) : undefined;
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 p-8">
+    <main className="mx-auto flex w-full max-w-[760px] flex-1 flex-col px-6 pt-14 pb-20">
       <ClimbDetail climb={climb} focusedSessionId={focusedSessionId} />
     </main>
   );

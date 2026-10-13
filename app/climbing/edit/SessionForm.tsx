@@ -1,10 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { BOARDS, GRADES, LOCATIONS, NOTES_MAX_CODE_POINTS, type Board, type Grade, type Location } from "@/lib/climbingLog/climbingLog";
+import { BOARDS, BOARD_SHORT_NAMES, GRADES, LOCATIONS, NOTES_MAX_CODE_POINTS, type Board, type Grade, type Location } from "@/lib/climbingLog/climbingLog";
 import { computeEditedSessionTimestamp, computeNewSessionTimestamp, toDateInputValue } from "@/lib/climbingLog/timestamp";
 import { addSessionAction, editSessionAction, logSessionAction, type ActionResult } from "./actions";
 import type { OperationSuccess } from "@/lib/climbingLog/climbingLog";
+import { BoardLogo, GRADE_COLORS, GradeTag } from "../styles";
+import { Chip, Dialog, ErrorText, FieldLabel, SectionHeading, inputClass, primaryButton, secondaryButton, textareaClass } from "./ui";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -197,124 +199,110 @@ export function SessionForm({ climbs = [], fixedClimb, editSession, onCancel, on
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <form
-        onSubmit={handleSubmit}
-        className="flex max-h-[90vh] w-full flex-col gap-6 overflow-y-auto rounded-t-2xl bg-white p-6 shadow-xl sm:max-w-md sm:rounded-2xl dark:bg-neutral-900"
-      >
-        <h2 className="text-lg font-semibold">{editSession ? "Edit Session" : "New Session"}</h2>
+    <Dialog>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-6 p-7">
+        <h2 className="text-[22px] font-semibold tracking-[-0.02em]">{editSession ? "Edit session" : "New session"}</h2>
 
         {!fixedClimb && !editSession && (
-        <section className="flex flex-col gap-3">
-          <h3 className="text-xs font-semibold uppercase tracking-widest text-neutral-400">
-            Problem
-          </h3>
+          <section className="flex flex-col gap-3.5">
+            <SectionHeading>Problem</SectionHeading>
 
-          <label className="flex flex-col gap-1">
-            <span className="text-sm text-neutral-500">Name</span>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => handleNameChange(e.target.value)}
-              className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800"
-              autoComplete="off"
-            />
-          </label>
+            <label className="flex flex-col gap-1.5">
+              <FieldLabel>Name</FieldLabel>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => handleNameChange(e.target.value)}
+                className={inputClass}
+                autoComplete="off"
+              />
+            </label>
 
-          {!locked && trimmedName.length > 0 && suggestions.length > 0 && (
-            <ul className="flex flex-col divide-y divide-neutral-100 rounded border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-700">
-              {suggestions.map((climb, i) => (
-                <li key={`${climb.name}-${climb.board}-${i}`}>
-                  <button
-                    type="button"
-                    onClick={() => selectSuggestion(climb)}
-                    className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-neutral-50 dark:hover:bg-neutral-800"
-                  >
-                    <span>{climb.name}</span>
-                    <span className="text-neutral-500">
-                      {climb.grade} · {climb.board}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+            {!locked && trimmedName.length > 0 && suggestions.length > 0 && (
+              <ul className="-mt-1.5 flex flex-col divide-y divide-[#f0f0f0] overflow-hidden rounded-[10px] border border-[#e5e5e5]">
+                {suggestions.map((climb, i) => (
+                  <li key={`${climb.name}-${climb.board}-${i}`}>
+                    <button
+                      type="button"
+                      onClick={() => selectSuggestion(climb)}
+                      className="flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-[#fafafa]"
+                    >
+                      <span className="truncate">{climb.name}</span>
+                      <span className="flex shrink-0 items-center gap-2.5 text-[13px] text-[#737373]">
+                        <GradeTag grade={climb.grade} />
+                        <span className="flex items-center gap-1.5">
+                          <BoardLogo board={climb.board} />
+                          {BOARD_SHORT_NAMES[climb.board]}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
 
-          <label className="flex flex-col gap-1">
-            <span className="text-sm text-neutral-500">Board</span>
-            <select
-              value={board}
-              disabled={locked}
-              onChange={(e) => setBoard(e.target.value as Board)}
-              className="rounded border border-neutral-300 px-3 py-2 disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-800"
-            >
-              {BOARDS.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
-          </label>
+            <div className="flex flex-col gap-1.5">
+              <FieldLabel>Board</FieldLabel>
+              <div className="flex flex-wrap gap-1.5">
+                {BOARDS.map((b) => (
+                  <Chip key={b} active={board === b} disabled={locked} onClick={() => setBoard(b)}>
+                    <BoardLogo board={b} inverted={board === b} />
+                    {BOARD_SHORT_NAMES[b]}
+                  </Chip>
+                ))}
+              </div>
+            </div>
 
-          <label className="flex flex-col gap-1">
-            <span className="text-sm text-neutral-500">Grade</span>
-            <select
-              value={grade}
-              disabled={locked}
-              onChange={(e) => setGrade(e.target.value as Grade)}
-              className="rounded border border-neutral-300 px-3 py-2 disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-800"
-            >
-              {GRADES.map((g) => (
-                <option key={g} value={g}>
-                  {g}
-                </option>
-              ))}
-            </select>
-          </label>
-        </section>
+            <div className="flex flex-col gap-1.5">
+              <FieldLabel>Grade</FieldLabel>
+              <div className="flex flex-wrap gap-1.5">
+                {GRADES.map((g) => (
+                  <Chip key={g} active={grade === g} disabled={locked} onClick={() => setGrade(g)} className="mono px-2.5 text-xs">
+                    <span className="size-1.5 rounded-full" style={{ background: GRADE_COLORS[g] }} />
+                    {g}
+                  </Chip>
+                ))}
+              </div>
+            </div>
+          </section>
         )}
 
-        <section className="flex flex-col gap-3">
-          <h3 className="text-xs font-semibold uppercase tracking-widest text-neutral-400">
-            Session
-          </h3>
+        <section className="flex flex-col gap-3.5">
+          <SectionHeading>Session</SectionHeading>
 
-          <label className="flex flex-col gap-1">
-            <span className="text-sm text-neutral-500">Date</span>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800"
-            />
-          </label>
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
+            <label className="flex flex-col gap-1.5">
+              <FieldLabel>Date</FieldLabel>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
+            </label>
 
-          <label className="flex flex-col gap-1">
-            <span className="text-sm text-neutral-500">Attempts</span>
-            <input
-              type="number"
-              min={1}
-              max={999}
-              value={attempts}
-              onChange={(e) => {
-                if (e.target.value === "") {
-                  setAttempts("");
-                  return;
-                }
-                const value = Number(e.target.value);
-                if (Number.isInteger(value)) {
-                  setAttempts(Math.min(999, Math.max(1, value)));
-                }
-              }}
-              className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800"
-            />
-          </label>
+            <label className="flex flex-col gap-1.5">
+              <FieldLabel>Attempts</FieldLabel>
+              <input
+                type="number"
+                min={1}
+                max={999}
+                value={attempts}
+                onChange={(e) => {
+                  if (e.target.value === "") {
+                    setAttempts("");
+                    return;
+                  }
+                  const value = Number(e.target.value);
+                  if (Number.isInteger(value)) {
+                    setAttempts(Math.min(999, Math.max(1, value)));
+                  }
+                }}
+                className={inputClass}
+              />
+            </label>
+          </div>
 
-          <label className="flex flex-col gap-1">
-            <span className="flex items-center justify-between text-sm text-neutral-500">
+          <label className="flex flex-col gap-1.5">
+            <FieldLabel>
               <span>Incline</span>
-              <span>{incline}°</span>
-            </span>
+              <span className="mono text-[#0a0a0a]">{incline}°</span>
+            </FieldLabel>
             <input
               type="range"
               min={0}
@@ -322,26 +310,29 @@ export function SessionForm({ climbs = [], fixedClimb, editSession, onCancel, on
               step={1}
               value={incline}
               onChange={(e) => setIncline(Number(e.target.value))}
+              className="accent-[#0a0a0a]"
             />
           </label>
 
-          <label className="flex items-center justify-between">
-            <span className="text-sm text-neutral-500">Sent</span>
-            <input
-              type="checkbox"
-              checked={sent}
-              onChange={(e) => setSent(e.target.checked)}
-              className="h-5 w-5"
-            />
-          </label>
+          <div className="flex flex-col gap-1.5">
+            <FieldLabel>Result</FieldLabel>
+            <div className="flex gap-1.5">
+              <Chip active={!sent} onClick={() => setSent(false)} className="h-9 flex-1 font-semibold">
+                Project
+              </Chip>
+              <Chip active={sent} activeColor="#16a34a" onClick={() => setSent(true)} className="h-9 flex-1 font-semibold">
+                Sent
+              </Chip>
+            </div>
+          </div>
 
-          <label className="flex flex-col gap-1">
-            <span className="text-sm text-neutral-500">Location</span>
+          <label className="flex flex-col gap-1.5">
+            <FieldLabel>Location</FieldLabel>
             <select
               value={location}
               onChange={(e) => setLocation(e.target.value as Location)}
               required
-              className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800"
+              className={`${inputClass} px-2.5`}
             >
               <option value="" disabled>
                 Select a location
@@ -354,51 +345,31 @@ export function SessionForm({ climbs = [], fixedClimb, editSession, onCancel, on
             </select>
           </label>
 
-          <label className="flex flex-col gap-1">
-            <span className="flex items-center justify-between text-sm text-neutral-500">
+          <label className="flex flex-col gap-1.5">
+            <FieldLabel>
               <span>Notes</span>
-              <span className={notesTooLong ? "text-red-600 dark:text-red-400" : ""}>
+              <span className={`mono text-xs ${notesTooLong ? "text-[#dc2626]" : "text-[#a3a3a3]"}`}>
                 {notesCodePointCount}/{NOTES_MAX_CODE_POINTS}
               </span>
-            </span>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-              className="resize-y rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800"
-            />
+            </FieldLabel>
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={textareaClass} />
             {notesTooLong && (
-              <span className="text-sm text-red-600 dark:text-red-400">
-                Notes must be at most {NOTES_MAX_CODE_POINTS} characters.
-              </span>
+              <span className="text-sm text-[#dc2626]">Notes must be at most {NOTES_MAX_CODE_POINTS} characters.</span>
             )}
           </label>
         </section>
 
-        {error && (
-          <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-            {error}
-          </p>
-        )}
+        {error && <ErrorText>{error}</ErrorText>}
 
-        <div className="flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={submitting}
-            className="rounded border border-neutral-400 px-4 py-2 text-sm hover:bg-neutral-100 dark:border-neutral-600 dark:hover:bg-neutral-800"
-          >
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onCancel} disabled={submitting} className={secondaryButton}>
             Cancel
           </button>
-          <button
-            type="submit"
-            disabled={!canSubmit}
-            className="rounded-full bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
-          >
+          <button type="submit" disabled={!canSubmit} className={`${primaryButton} px-5`}>
             {editSession ? "Save" : "Log"}
           </button>
         </div>
       </form>
-    </div>
+    </Dialog>
   );
 }

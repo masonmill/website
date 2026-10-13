@@ -3,17 +3,25 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, Circle, Pencil, StickyNote, Trash2 } from "lucide-react";
+import { Pencil, StickyNote, Trash2 } from "lucide-react";
 import { buildClimbDetailRows, computeSendsCount } from "@/lib/climbingLog/climbDetail";
 import { formatAttempts } from "@/lib/climbingLog/editorList";
-import { BOARD_SHORT_NAMES, type Climb, type Session } from "@/lib/climbingLog/climbingLog";
+import {
+  BOARD_SHORT_NAMES,
+  LOCATION_SHORT_NAMES,
+  computeSessionLabel,
+  type Climb,
+  type Session,
+} from "@/lib/climbingLog/climbingLog";
+import { BoardLogo, GradeTag, SendLabelPill } from "../../../styles";
 import { SessionForm } from "../../SessionForm";
 import { ClimbForm } from "../../ClimbForm";
 import { deleteSessionAction } from "../../actions";
+import { Dialog, ErrorText, dangerButton, iconButton, primaryButton, secondaryButton } from "../../ui";
 
 function formatDayLabel(timestampSeconds: number): string {
   const d = new Date(timestampSeconds * 1000);
-  return d.toLocaleDateString(undefined, {
+  return d.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -93,14 +101,39 @@ export function ClimbDetail({
     router.refresh();
   }
 
+  // Labels need chronological position; rows are newest-first.
+  const chron = [...climb.sessions].sort((a, b) => a.timestamp - b.timestamp);
+  const labelFor = (sessionId: number) => {
+    const idx = chron.findIndex((s) => s.id === sessionId);
+    const s = chron[idx];
+    return computeSessionLabel({
+      sent: s.sent,
+      attempts: s.attempts,
+      sessionIndex: idx,
+      priorSentInClimb: chron.slice(0, idx).some((x) => x.sent),
+    });
+  };
+
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-1">
-        <Link href="/climbing/edit" className="text-sm text-neutral-500 underline dark:text-neutral-400">
-          Back to log
+    <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-4 border-b border-[#0a0a0a] pb-5">
+        <Link href="/climbing/edit" className="text-sm text-[#737373] hover:text-[#0a0a0a]">
+          ← Editor
         </Link>
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold">{climb.name}</h1>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div className="flex min-w-0 flex-col gap-2.5">
+            <span className="flex flex-wrap items-center gap-x-2.5 text-[13px] text-[#737373]">
+              <GradeTag grade={climb.grade} />
+              <span className="flex items-center gap-1.5">
+                <BoardLogo board={climb.board} />
+                {BOARD_SHORT_NAMES[climb.board]}
+              </span>
+              {sendsCount > 0 && <span>{sendsCount === 1 ? "1 send" : `${sendsCount} sends`}</span>}
+            </span>
+            <h1 className="text-[clamp(30px,7vw,40px)] leading-[1.05] font-semibold tracking-[-0.04em] break-words">
+              {climb.name}
+            </h1>
+          </div>
           <div className="flex shrink-0 items-center gap-2">
             {/*
               With no session focused, this is the detail page's only "Edit"
@@ -112,118 +145,93 @@ export function ClimbDetail({
             <button
               type="button"
               onClick={() => setIsEditingClimb(true)}
-              aria-label={focusedSessionId === undefined ? "Edit" : "Edit climb"}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+              className={`${secondaryButton} gap-2 px-3.5`}
             >
-              <Pencil className="h-4 w-4" />
+              <Pencil className="size-3.5" />
+              <span>{focusedSessionId === undefined ? "Edit" : "Edit climb"}</span>
             </button>
-            <button
-              type="button"
-              onClick={() => setIsFormOpen(true)}
-              aria-label="Log session"
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-900 text-lg font-medium text-white hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
-            >
-              +
+            <button type="button" onClick={() => setIsFormOpen(true)} className={primaryButton}>
+              <span className="text-lg leading-none">+</span>
+              <span>Log session</span>
             </button>
           </div>
         </div>
-      </header>
-
-      <div className="flex flex-col gap-1 rounded-xl border border-neutral-100 px-4 py-3 dark:border-neutral-800">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-neutral-500 dark:text-neutral-400">Grade</span>
-          <span className="text-sm font-medium">{climb.grade}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-neutral-500 dark:text-neutral-400">Board</span>
-          <span className="text-sm font-medium">{BOARD_SHORT_NAMES[climb.board]}</span>
-        </div>
-        {sendsCount > 0 && (
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-neutral-500 dark:text-neutral-400">Sends</span>
-            <span className="text-sm font-medium">{sendsCount}</span>
-          </div>
-        )}
       </div>
 
-      <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-          Sessions ({rows.length})
-        </p>
+      <section className="flex flex-col">
+        <h2 className="pb-2 text-[15px] font-semibold">
+          Sessions <span className="mono text-[13px] font-normal text-[#a3a3a3]">{rows.length}</span>
+        </h2>
         {rows.length === 0 ? (
-          <p className="text-neutral-500 dark:text-neutral-400">No sessions yet.</p>
+          <p className="py-8 text-[#737373]">No sessions yet.</p>
         ) : (
-          <div className="flex flex-col divide-y divide-neutral-100 rounded-xl border border-neutral-100 dark:divide-neutral-800 dark:border-neutral-800">
-            {rows.map((row) => {
-              const hasNotes = row.notes !== undefined && row.notes.length > 0;
-              const notesExpanded = expandedNotesId === row.sessionId;
-              return (
-                <div
-                  key={row.sessionId}
-                  ref={row.sessionId === focusedSessionId ? focusedRef : undefined}
-                  className="flex flex-col px-3 py-3 sm:px-4"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-base font-medium text-neutral-900 dark:text-neutral-100">
-                        {formatDayLabel(row.timestamp)}
-                      </span>
-                      <span className="text-sm text-neutral-500 dark:text-neutral-400">
-                        {formatAttempts(row.attempts)} · {row.incline}°
-                      </span>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      {row.sent ? (
-                        <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600 dark:text-green-400" />
-                      ) : (
-                        <Circle className="h-5 w-5 shrink-0 text-neutral-400 dark:text-neutral-600" />
+          rows.map((row) => {
+            const session = findSession(row.sessionId);
+            const hasNotes = row.notes !== undefined && row.notes.length > 0;
+            const notesExpanded = expandedNotesId === row.sessionId;
+            const focused = row.sessionId === focusedSessionId;
+            return (
+              <div
+                key={row.sessionId}
+                ref={focused ? focusedRef : undefined}
+                className={`flex flex-col rounded-[10px] ${focused ? "bg-[#f5f5f5]" : "hover:bg-[#fafafa]"}`}
+              >
+                <div className="flex items-center gap-3 py-3 pr-1.5 pl-3">
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className="text-base font-medium">{formatDayLabel(row.timestamp)}</span>
+                    <span className="flex flex-wrap items-center gap-x-2.5 text-[13px] text-[#737373]">
+                      {session && (
+                        <span className="mono text-xs">
+                          {LOCATION_SHORT_NAMES[session.location] ?? session.location}
+                        </span>
                       )}
-                      {hasNotes && (
-                        <button
-                          type="button"
-                          aria-label={notesExpanded ? "Hide notes" : "Show notes"}
-                          onClick={() =>
-                            setExpandedNotesId((prev) => (prev === row.sessionId ? null : row.sessionId))
-                          }
-                          className={`rounded p-1 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100 ${
-                            notesExpanded ? "text-neutral-900 dark:text-neutral-100" : ""
-                          }`}
-                        >
-                          <StickyNote className="h-4 w-4" />
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        aria-label="Edit session"
-                        onClick={() => setEditingSession(findSession(row.sessionId) ?? null)}
-                        className="rounded p-1 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        aria-label="Delete session"
-                        onClick={() => {
-                          setDeleteError(null);
-                          setSessionToDelete(findSession(row.sessionId) ?? null);
-                        }}
-                        className="rounded p-1 text-neutral-500 hover:bg-neutral-100 hover:text-red-600 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-red-400"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
+                      <span>{row.incline}°</span>
+                      <span>{formatAttempts(row.attempts)}</span>
+                    </span>
                   </div>
-                  {hasNotes && notesExpanded && (
-                    <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-600 dark:text-neutral-300">
-                      {row.notes}
-                    </p>
-                  )}
+                  <SendLabelPill label={labelFor(row.sessionId)} />
+                  <div className="flex items-center">
+                    {hasNotes && (
+                      <button
+                        type="button"
+                        aria-label={notesExpanded ? "Hide notes" : "Show notes"}
+                        onClick={() =>
+                          setExpandedNotesId((prev) => (prev === row.sessionId ? null : row.sessionId))
+                        }
+                        className={`${iconButton} ${notesExpanded ? "text-[#0a0a0a]" : ""}`}
+                      >
+                        <StickyNote className="size-4" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      aria-label="Edit session"
+                      onClick={() => setEditingSession(session ?? null)}
+                      className={iconButton}
+                    >
+                      <Pencil className="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Delete session"
+                      onClick={() => {
+                        setDeleteError(null);
+                        setSessionToDelete(session ?? null);
+                      }}
+                      className={`${iconButton} hover:bg-[#fef2f2] hover:text-[#dc2626]`}
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
                 </div>
-              );
-            })}
-          </div>
+                {hasNotes && notesExpanded && (
+                  <p className="px-3 pb-3 text-sm leading-normal whitespace-pre-wrap text-[#404040]">{row.notes}</p>
+                )}
+              </div>
+            );
+          })
         )}
-      </div>
+      </section>
 
       {isFormOpen && (
         <SessionForm
@@ -261,39 +269,23 @@ export function ClimbDetail({
       )}
 
       {sessionToDelete && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-          <div className="flex w-full flex-col gap-4 rounded-t-2xl bg-white p-6 shadow-xl sm:max-w-sm sm:rounded-2xl dark:bg-neutral-900">
-            <h2 className="text-lg font-semibold">Delete Session</h2>
-            <p className="text-sm text-neutral-600 dark:text-neutral-300">
-              {climb.sessions.length === 1
-                ? "This is the climb's last session — deleting it removes the whole climb. This cannot be undone."
-                : "Delete this session? This cannot be undone."}
-            </p>
-            {deleteError && (
-              <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-                {deleteError}
-              </p>
-            )}
-            <div className="flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setSessionToDelete(null)}
-                disabled={deleting}
-                className="rounded border border-neutral-400 px-4 py-2 text-sm hover:bg-neutral-100 dark:border-neutral-600 dark:hover:bg-neutral-800"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmDelete}
-                disabled={deleting}
-                className="rounded-full bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
-              >
-                Delete
-              </button>
-            </div>
+        <Dialog className="max-w-[400px] gap-3.5 p-6">
+          <h2 className="text-xl font-semibold tracking-[-0.02em]">Delete session</h2>
+          <p className="text-sm leading-[1.55] text-[#525252]">
+            {climb.sessions.length === 1
+              ? "This is the climb's last session — deleting it removes the whole climb. This cannot be undone."
+              : "Delete this session? This cannot be undone."}
+          </p>
+          {deleteError && <ErrorText>{deleteError}</ErrorText>}
+          <div className="mt-1.5 flex justify-end gap-2">
+            <button type="button" onClick={() => setSessionToDelete(null)} disabled={deleting} className={secondaryButton}>
+              Cancel
+            </button>
+            <button type="button" onClick={handleConfirmDelete} disabled={deleting} className={dangerButton}>
+              Delete
+            </button>
           </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

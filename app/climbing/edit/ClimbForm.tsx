@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { BOARDS, GRADES, type Board, type Grade } from "@/lib/climbingLog/climbingLog";
+import { BOARDS, BOARD_SHORT_NAMES, GRADES, type Board, type Grade } from "@/lib/climbingLog/climbingLog";
 import { editClimbAction, type ActionResult } from "./actions";
 import type { OperationSuccess } from "@/lib/climbingLog/climbingLog";
+import { BoardLogo, GRADE_COLORS } from "../styles";
+import { Chip, Dialog, ErrorText, FieldLabel, inputClass, primaryButton, secondaryButton } from "./ui";
 
 export interface ClimbFormClimb {
   id: number;
@@ -70,80 +72,58 @@ export function ClimbForm({ climb, onCancel, onSuccess, onNotFound }: ClimbFormP
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <form
-        onSubmit={handleSubmit}
-        className="flex max-h-[90vh] w-full flex-col gap-6 overflow-y-auto rounded-t-2xl bg-white p-6 shadow-xl sm:max-w-md sm:rounded-2xl dark:bg-neutral-900"
-      >
-        <h2 className="text-lg font-semibold">Edit Climb</h2>
+    <Dialog>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-6 p-7">
+        <h2 className="text-[22px] font-semibold tracking-[-0.02em]">Edit climb</h2>
 
-        <section className="flex flex-col gap-3">
-          <label className="flex flex-col gap-1">
-            <span className="text-sm text-neutral-500">Name</span>
+        <section className="flex flex-col gap-3.5">
+          <label className="flex flex-col gap-1.5">
+            <FieldLabel>Name</FieldLabel>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800"
+              className={inputClass}
               autoComplete="off"
             />
           </label>
 
-          <label className="flex flex-col gap-1">
-            <span className="text-sm text-neutral-500">Board</span>
-            <select
-              value={board}
-              onChange={(e) => setBoard(e.target.value as Board)}
-              className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800"
-            >
+          <div className="flex flex-col gap-1.5">
+            <FieldLabel>Board</FieldLabel>
+            <div className="flex flex-wrap gap-1.5">
               {BOARDS.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
+                <Chip key={b} active={board === b} onClick={() => setBoard(b)}>
+                  <BoardLogo board={b} inverted={board === b} />
+                  {BOARD_SHORT_NAMES[b]}
+                </Chip>
               ))}
-            </select>
-          </label>
+            </div>
+          </div>
 
-          <label className="flex flex-col gap-1">
-            <span className="text-sm text-neutral-500">Grade</span>
-            <select
-              value={grade}
-              onChange={(e) => setGrade(e.target.value as Grade)}
-              className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800"
-            >
+          <div className="flex flex-col gap-1.5">
+            <FieldLabel>Grade</FieldLabel>
+            <div className="flex flex-wrap gap-1.5">
               {GRADES.map((g) => (
-                <option key={g} value={g}>
+                <Chip key={g} active={grade === g} onClick={() => setGrade(g)} className="mono px-2.5 text-xs">
+                  <span className="size-1.5 rounded-full" style={{ background: GRADE_COLORS[g] }} />
                   {g}
-                </option>
+                </Chip>
               ))}
-            </select>
-          </label>
+            </div>
+          </div>
         </section>
 
-        {error && (
-          <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-            {error}
-          </p>
-        )}
+        {error && <ErrorText>{error}</ErrorText>}
 
-        <div className="flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={submitting}
-            className="rounded border border-neutral-400 px-4 py-2 text-sm hover:bg-neutral-100 dark:border-neutral-600 dark:hover:bg-neutral-800"
-          >
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onCancel} disabled={submitting} className={secondaryButton}>
             Cancel
           </button>
-          <button
-            type="submit"
-            disabled={!canSubmit}
-            className="rounded-full bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
-          >
+          <button type="submit" disabled={!canSubmit} className={`${primaryButton} px-5`}>
             Save
           </button>
         </div>
       </form>
-    </div>
+    </Dialog>
   );
 }

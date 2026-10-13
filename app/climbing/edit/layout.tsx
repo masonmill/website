@@ -35,28 +35,30 @@ export default async function EditLayout({
     // climb detail, etc.) is gated the same way instead of relying on each
     // page to repeat this check and risk missing one.
     return (
-      <main className="mx-auto flex min-h-screen max-w-lg flex-col items-center justify-center gap-4 p-8 text-center">
-        <h1 className="text-2xl font-semibold">Access denied</h1>
-        <p className="text-neutral-500">
-          This GitHub account does not have access to the climbing log
-          editor.
-        </p>
-        <SignOutButton />
-      </main>
+      <div className="site">
+        <main className="mx-auto flex max-w-lg flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
+          <h1 className="text-[28px] font-semibold tracking-[-0.03em]">Access denied</h1>
+          <p className="text-[#737373]">
+            This GitHub account does not have access to the climbing log
+            editor.
+          </p>
+          <SignOutButton />
+        </main>
+      </div>
     );
   }
 
   return (
-    <>
-      <div className="mx-auto max-w-2xl px-8 pt-8">
-        <Link
-          href="/climbing"
-          className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-        >
-          ← climbing log
-        </Link>
-      </div>
+    <div className="site">
+      <header className="sticky top-0 z-10 border-b border-[#f0f0f0] bg-white/90 backdrop-blur-md">
+        <nav className="mx-auto flex h-16 max-w-[760px] items-center justify-between gap-4 px-6">
+          <Link href="/climbing" className="text-sm font-medium text-[#737373] hover:text-[#0a0a0a]">
+            Climbing log
+          </Link>
+          <SignOutButton />
+        </nav>
+      </header>
       {children}
-    </>
+    </div>
   );
 }

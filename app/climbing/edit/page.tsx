@@ -1,5 +1,4 @@
 import { readLog } from "@/lib/climbingLog/githubStorage";
-import { SignOutButton } from "./SignOutButton";
 import { EditorRetryButton } from "./EditorRetryButton";
 import { EditorLogList } from "./EditorLogList";
 
@@ -13,19 +12,13 @@ export default async function EditPage() {
   const result = await readLog("fresh");
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 p-8">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Climbing Log</h1>
-        <SignOutButton />
-      </header>
+    <main className="mx-auto flex w-full max-w-[760px] flex-1 flex-col gap-8 px-6 pt-14 pb-20">
       {result.ok ? (
         <EditorLogList log={result.value.log} />
       ) : (
         <div className="flex flex-col items-center gap-3 py-16 text-center">
           <h2 className="text-lg font-semibold">Couldn&apos;t load the log</h2>
-          <p className="text-neutral-500 dark:text-neutral-400">
-            {result.error.message}
-          </p>
+          <p className="text-[#737373]">{result.error.message}</p>
           <EditorRetryButton />
         </div>
       )}

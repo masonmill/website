@@ -10,9 +10,11 @@ import {
   type DayKeyFn,
   type EditorSessionRow,
 } from "@/lib/climbingLog/editorList";
-import type { Log, SendLabel } from "@/lib/climbingLog/climbingLog";
+import { LOCATION_SHORT_NAMES, type Log } from "@/lib/climbingLog/climbingLog";
+import { BoardLogo, GradeTag, SendLabelPill } from "../styles";
 import { SessionForm } from "./SessionForm";
 import { deleteSessionAction } from "./actions";
+import { Dialog, ErrorText, dangerButton, iconButton, primaryButton, secondaryButton } from "./ui";
 
 // ─── Local (browser) day grouping ──────────────────────────────────────────
 //
@@ -26,28 +28,12 @@ const localDayKey: DayKeyFn = (timestampSeconds) => {
 };
 
 function formatDayLabel(timestampSeconds: number): string {
-  const d = new Date(timestampSeconds * 1000);
-  return d.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  return new Date(timestampSeconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-// ─── Styling ────────────────────────────────────────────────────────────
+const yearOf = (timestampSeconds: number) => new Date(timestampSeconds * 1000).getFullYear();
 
-const LABEL_STYLES: Partial<Record<SendLabel, string>> = {
-  Flash: "text-sm font-semibold text-green-600 dark:text-green-400",
-  "Day flash": "text-sm font-semibold text-green-600 dark:text-green-400",
-  Sent: "text-sm font-semibold text-green-600 dark:text-green-400",
-  Repeat: "text-sm font-semibold text-blue-600 dark:text-blue-400",
-  // "Project" intentionally has no style — it is hidden entirely.
-};
-
-function SessionLabel({ label }: { label: SendLabel }) {
-  if (label === "Project") return null;
-  return <span className={LABEL_STYLES[label]}>{label}</span>;
-}
+const plural = (n: number, word: string) => `${n} ${word}${n !== 1 ? "s" : ""}`;
 
 function SessionRowView({
   row,
@@ -62,70 +48,48 @@ function SessionRowView({
 }) {
   const hasNotes = row.notes !== undefined && row.notes.length > 0;
   return (
-    <div className="flex flex-col hover:bg-neutral-50 dark:hover:bg-neutral-800">
-      <div className="flex items-center gap-1">
+    <div className="flex flex-col rounded-[10px] hover:bg-[#fafafa]">
+      <div className="flex items-center gap-1 pr-1.5">
         <Link
           href={`/climbing/edit/climb/${row.climbId}?session=${row.sessionId}`}
-          className="flex min-w-0 flex-1 items-center justify-between gap-3 px-3 py-3 sm:px-4"
+          className="flex min-w-0 flex-1 items-center justify-between gap-3 p-3"
         >
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <span className="truncate text-base font-medium text-neutral-900 dark:text-neutral-100">
-              {row.name}
-            </span>
-            <span className="text-sm text-neutral-500 dark:text-neutral-400">
-              {row.grade} · {row.boardShort} · {row.incline}° · {formatAttempts(row.attempts)}
+          <div className="flex min-w-0 flex-col gap-1">
+            <span className="truncate text-base font-medium">{row.name}</span>
+            <span className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[13px] text-[#737373]">
+              <GradeTag grade={row.grade} />
+              <span className="flex items-center gap-1.5">
+                <BoardLogo board={row.board} />
+                {row.boardShort}
+              </span>
+              <span>{row.incline}°</span>
+              <span>{formatAttempts(row.attempts)}</span>
             </span>
           </div>
-          <div className="shrink-0">
-            <SessionLabel label={row.label} />
-          </div>
+          <SendLabelPill label={row.label} />
         </Link>
         {hasNotes && (
           <button
             type="button"
             aria-label={notesExpanded ? "Hide notes" : "Show notes"}
             onClick={() => onToggleNotes(row)}
-            className={`shrink-0 rounded p-1 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100 ${
-              notesExpanded ? "text-neutral-900 dark:text-neutral-100" : ""
-            }`}
+            className={`${iconButton} ${notesExpanded ? "text-[#0a0a0a]" : ""}`}
           >
-            <StickyNote className="h-4 w-4" />
+            <StickyNote className="size-4" />
           </button>
         )}
         <button
           type="button"
           aria-label="Delete session"
           onClick={() => onDelete(row)}
-          className="mr-2 shrink-0 rounded p-1 text-neutral-500 hover:bg-neutral-100 hover:text-red-600 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-red-400"
+          className={`${iconButton} hover:bg-[#fef2f2] hover:text-[#dc2626]`}
         >
-          <Trash2 className="h-4 w-4" />
+          <Trash2 className="size-4" />
         </button>
       </div>
       {hasNotes && notesExpanded && (
-        <p className="whitespace-pre-wrap px-3 pb-3 text-sm text-neutral-600 sm:px-4 dark:text-neutral-300">
-          {row.notes}
-        </p>
+        <p className="px-3 pb-3 text-sm leading-normal whitespace-pre-wrap text-[#404040]">{row.notes}</p>
       )}
-    </div>
-  );
-}
-
-// ─── Empty state ────────────────────────────────────────────────────────
-
-function EmptyState({ onLogSession }: { onLogSession: () => void }) {
-  return (
-    <div className="flex flex-col items-center gap-3 py-16 text-center">
-      <h2 className="text-lg font-semibold">No Climbs</h2>
-      <p className="text-neutral-500 dark:text-neutral-400">
-        Log your first session to get started.
-      </p>
-      <button
-        type="button"
-        onClick={onLogSession}
-        className="mt-2 rounded-full bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
-      >
-        Log Session
-      </button>
     </div>
   );
 }
@@ -145,6 +109,9 @@ export function EditorLogList({ log }: { log: Log }) {
     () => log.climbs.map((c) => ({ name: c.name, board: c.board, grade: c.grade })),
     [log]
   );
+
+  const findSession = (row: EditorSessionRow) =>
+    log.climbs.find((c) => c.id === row.climbId)?.sessions.find((s) => s.id === row.sessionId);
 
   const isLastSessionOfClimb = (row: EditorSessionRow) =>
     log.climbs.find((c) => c.id === row.climbId)?.sessions.length === 1;
@@ -195,116 +162,120 @@ export function EditorLogList({ log }: { log: Log }) {
   );
 
   const deleteDialog = sessionToDelete && (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="flex w-full flex-col gap-4 rounded-t-2xl bg-white p-6 shadow-xl sm:max-w-sm sm:rounded-2xl dark:bg-neutral-900">
-        <h2 className="text-lg font-semibold">Delete Session</h2>
-        <p className="text-sm text-neutral-600 dark:text-neutral-300">
-          {isLastSessionOfClimb(sessionToDelete)
-            ? `This is the last session for "${sessionToDelete.name}" — deleting it removes the whole climb. This cannot be undone.`
-            : `Delete this session for "${sessionToDelete.name}"? This cannot be undone.`}
-        </p>
-        {deleteError && (
-          <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-            {deleteError}
-          </p>
-        )}
-        <div className="flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={() => setSessionToDelete(null)}
-            disabled={deleting}
-            className="rounded border border-neutral-400 px-4 py-2 text-sm hover:bg-neutral-100 dark:border-neutral-600 dark:hover:bg-neutral-800"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleConfirmDelete}
-            disabled={deleting}
-            className="rounded-full bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  if (log.climbs.length === 0) {
-    return (
-      <>
-        <EmptyState onLogSession={() => setIsFormOpen(true)} />
-        {form}
-      </>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-8">
-      {form}
-      {deleteDialog}
-      <div className="flex items-center justify-end">
-        <button
-          type="button"
-          onClick={() => setIsFormOpen(true)}
-          aria-label="Log session"
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-900 text-lg font-medium text-white hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
-        >
-          +
+    <Dialog className="max-w-[400px] gap-3.5 p-6">
+      <h2 className="text-xl font-semibold tracking-[-0.02em]">Delete session</h2>
+      <p className="text-sm leading-[1.55] text-[#525252]">
+        {isLastSessionOfClimb(sessionToDelete)
+          ? `This is the last session for "${sessionToDelete.name}" — deleting it removes the whole climb. This cannot be undone.`
+          : `Delete this session for "${sessionToDelete.name}"? This cannot be undone.`}
+      </p>
+      {deleteError && <ErrorText>{deleteError}</ErrorText>}
+      <div className="mt-1.5 flex justify-end gap-2">
+        <button type="button" onClick={() => setSessionToDelete(null)} disabled={deleting} className={secondaryButton}>
+          Cancel
+        </button>
+        <button type="button" onClick={handleConfirmDelete} disabled={deleting} className={dangerButton}>
+          Delete
         </button>
       </div>
-      <div className="flex flex-col gap-6">
-        {data.dayGroups.map((group) => (
-          <div key={group.dayKey}>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-              {formatDayLabel(group.rows[0].timestamp)}
-            </p>
-            <div className="flex flex-col divide-y divide-neutral-100 rounded-xl border border-neutral-100 dark:divide-neutral-800 dark:border-neutral-800">
-              {group.rows.map((row) => {
-                const key = `${row.climbId}-${row.sessionId}`;
-                return (
-                  <SessionRowView
-                    key={key}
-                    row={row}
-                    onDelete={(r) => {
-                      setDeleteError(null);
-                      setSessionToDelete(r);
-                    }}
-                    notesExpanded={expandedNotesKey === key}
-                    onToggleNotes={() =>
-                      setExpandedNotesKey((prev) => (prev === key ? null : key))
-                    }
-                  />
-                );
-              })}
-            </div>
-          </div>
-        ))}
+    </Dialog>
+  );
+
+  const sessionCount = data.dayGroups.length;
+
+  return (
+    <>
+      {form}
+      {deleteDialog}
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[#0a0a0a] pb-5">
+        <div className="flex flex-col gap-2.5">
+          <span className="mono text-[13px] text-[#737373]">
+            {plural(log.climbs.length, "problem")} · {plural(sessionCount, "session")}
+          </span>
+          <h1 className="text-[clamp(34px,8vw,44px)] leading-none font-semibold tracking-[-0.04em]">Editor</h1>
+        </div>
+        <button type="button" onClick={() => setIsFormOpen(true)} className={primaryButton}>
+          <span className="text-lg leading-none">+</span>
+          <span>Log session</span>
+        </button>
       </div>
 
-      {data.climbsWithNoSessions.length > 0 && (
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-            No Sessions
-          </p>
-          <div className="flex flex-col divide-y divide-neutral-100 rounded-xl border border-neutral-100 dark:divide-neutral-800 dark:border-neutral-800">
-            {data.climbsWithNoSessions.map((climb) => (
-              <Link
-                key={climb.climbId}
-                href={`/climbing/edit/climb/${climb.climbId}`}
-                className="flex flex-col gap-0.5 px-3 py-3 hover:bg-neutral-50 sm:px-4 dark:hover:bg-neutral-800"
-              >
-                <span className="truncate text-base font-medium text-neutral-900 dark:text-neutral-100">
-                  {climb.name}
-                </span>
-                <span className="text-sm text-neutral-500 dark:text-neutral-400">
-                  {climb.grade} · {climb.boardShort}
-                </span>
-              </Link>
-            ))}
-          </div>
+      {log.climbs.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 py-16 text-center">
+          <h2 className="text-lg font-semibold">No climbs</h2>
+          <p className="text-[#737373]">Log your first session to get started.</p>
+        </div>
+      ) : (
+        <div className="flex flex-col">
+          {data.dayGroups.map((group, gi) => {
+            const first = group.rows[0];
+            const next = data.dayGroups[gi + 1];
+            const showYear = !next || yearOf(next.rows[0].timestamp) !== yearOf(first.timestamp);
+            const location = findSession(first)?.location;
+            return (
+              <div key={group.dayKey}>
+                <div className="flex flex-wrap gap-x-7 gap-y-1 border-b border-[#f0f0f0] py-5">
+                  <div className="flex flex-[0_0_120px] flex-col gap-[3px] pt-3">
+                    <span className="text-[15px] font-semibold tracking-[-0.01em]">{formatDayLabel(first.timestamp)}</span>
+                    {location && (
+                      <span className="mono text-xs whitespace-nowrap text-[#737373]">
+                        {LOCATION_SHORT_NAMES[location] ?? location}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex min-w-0 flex-[1_1_400px] flex-col">
+                    {group.rows.map((row) => {
+                      const key = `${row.climbId}-${row.sessionId}`;
+                      return (
+                        <SessionRowView
+                          key={key}
+                          row={row}
+                          onDelete={(r) => {
+                            setDeleteError(null);
+                            setSessionToDelete(r);
+                          }}
+                          notesExpanded={expandedNotesKey === key}
+                          onToggleNotes={() => setExpandedNotesKey((prev) => (prev === key ? null : key))}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+                {showYear && (
+                  <div className="flex items-center gap-3.5 pt-7 pb-1">
+                    <span className="text-[15px] font-semibold tracking-[-0.01em]">{yearOf(first.timestamp)}</span>
+                    <span className="h-px flex-1 bg-[#e5e5e5]" />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {data.climbsWithNoSessions.length > 0 && (
+            <div className="flex flex-wrap gap-x-7 gap-y-1 py-5">
+              <div className="flex-[0_0_120px] pt-3 text-[15px] font-semibold tracking-[-0.01em]">No sessions</div>
+              <div className="flex min-w-0 flex-[1_1_400px] flex-col">
+                {data.climbsWithNoSessions.map((climb) => (
+                  <Link
+                    key={climb.climbId}
+                    href={`/climbing/edit/climb/${climb.climbId}`}
+                    className="flex flex-col gap-1 rounded-[10px] p-3 hover:bg-[#fafafa]"
+                  >
+                    <span className="truncate text-base font-medium">{climb.name}</span>
+                    <span className="flex items-center gap-2.5 text-[13px] text-[#737373]">
+                      <GradeTag grade={climb.grade} />
+                      <span className="flex items-center gap-1.5">
+                        <BoardLogo board={climb.board} />
+                        {climb.boardShort}
+                      </span>
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
-    </div>
+    </>
   );
 }

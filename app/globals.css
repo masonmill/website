@@ -30,3 +30,33 @@ body {
   .svg-icon { filter: invert(1); }
   .brand-link { color: rgb(96 165 250); }
 }
+
+/* ─── Public site (home + /climbing) ─────────────────────────────────────── */
+
+.site {
+  --mono: var(--font-dm-mono), ui-monospace, monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  color: #0a0a0a;
+  font-family: var(--font-hanken), Helvetica, Arial, sans-serif;
+  color-scheme: light;
+}
+
+.site .mono {
+  font-family: var(--mono);
+}
+
+@keyframes site-reveal {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.reveal {
+  animation: site-reveal 700ms ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { animation: none; }
+}

@@ -1,16 +1,16 @@
 "use client";
 
-import { motion, AnimatePresence } from "motion/react";
-import { useState, useMemo } from "react";
-import Link from "next/link";
-import Image from "next/image";
-import { ChevronDown, StickyNote } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import SiteChrome from "../SiteChrome";
+import { BoardLogo, GRADE_COLORS, GradeTag, LABEL_STYLES, SendLabelPill } from "./styles";
 import {
   BOARDS,
   BOARD_SHORT_NAMES,
   GRADES,
   LOCATIONS,
-  LOCATION_SHORT_NAMES as LIB_LOCATION_SHORT_NAMES,
+  LOCATION_SHORT_NAMES,
+  computeSessionLabel,
+  type SendLabel,
 } from "@/lib/climbingLog/climbingLog";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -33,393 +33,39 @@ export interface LogClimb {
   sessions: LogSession[];
 }
 
-// Flattened for display: one row per session, with climb info attached.
+// One row per session, with its climb attached.
 interface SessionRow {
-  climbId: number;
-  sessionId: number;
-  name: string;
-  board: string;
-  grade: string;
-  timestamp: number;
-  attempts: number;
-  incline: number;
-  location: string;
+  key: string;
+  climb: LogClimb;
+  session: LogSession;
+  label: SendLabel;
   // True if any session of this climb has been sent. Once a climb is sent,
   // earlier project attempts are no longer treated as projects.
   climbSent: boolean;
-  label: SendLabel;
-  notes?: string;
 }
+
+// One dot on the chart per climb: where it was sent, or last tried.
+interface ChartPoint {
+  id: number;
+  name: string;
+  grade: string;
+  board: string;
+  timestamp: number;
+  kind: "flash" | "sent" | "project";
+  attempts: number;
+  sessionCount: number;
+}
+
+type StatusFilter = "all" | "sent" | "project";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const LOCATION_SHORT_NAMES: Record<string, string> = LIB_LOCATION_SHORT_NAMES;
-
-const GRADE_COLORS: Record<string, string> = {
-  "6a+/V3": "text-green-700  bg-green-50",
-  "6b/V4":  "text-blue-700   bg-blue-50",
-  "6b+/V4": "text-blue-700   bg-blue-50",
-  "6c/V5":  "text-orange-700 bg-orange-50",
-  "6c+/V5": "text-orange-700 bg-orange-50",
-  "7a/V6":  "text-red-700    bg-red-50",
-  "7a+/V7": "text-purple-700 bg-purple-50",
-};
-
-const GRADE_COLORS_DARK: Record<string, string> = {
-  "6a+/V3": "dark:text-green-400  dark:bg-green-950",
-  "6b/V4":  "dark:text-blue-400   dark:bg-blue-950",
-  "6b+/V4": "dark:text-blue-400   dark:bg-blue-950",
-  "6c/V5":  "dark:text-orange-400 dark:bg-orange-950",
-  "6c+/V5": "dark:text-orange-400 dark:bg-orange-950",
-  "7a/V6":  "dark:text-red-400    dark:bg-red-950",
-  "7a+/V7": "dark:text-purple-400 dark:bg-purple-950",
-};
-
-type StatusFilter = "all" | "sent" | "project";
-type SendLabel = "Flash" | "Day flash" | "Repeat" | "Sent" | "Project";
-
-// ─── Animation variants ───────────────────────────────────────────────────────
-
-const fadeDown = {
-  initial: { opacity: 0, y: -10 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.6 },
-};
-
-const staggerList = {
-  initial: "hidden",
-  animate: "visible",
-  variants: {
-    hidden: {},
-    visible: { transition: { staggerChildren: 0.06 } },
-  },
-};
-
-const fadeUp = {
-  variants: {
-    hidden:  { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0 },
-  },
-};
-
-// ─── Stats ───────────────────────────────────────────────────────────────────
-
-interface GradeStat {
-  grade: string;
-  total: number;
-  sent: number;
-}
-
-interface WeekBucket {
-  weekStart: number; // epoch seconds of Monday
-  sessions: number;
-  attempts: number;
-  sends: number;
-}
-
-const HEATMAP_MAX_WEEKS = 26;
-
-function mondayOfWeek(epochSeconds: number): number {
-  const d = new Date(epochSeconds * 1000);
-  const day = d.getUTCDay();
-  const diff = day === 0 ? 6 : day - 1; // Monday = 0
-  d.setUTCDate(d.getUTCDate() - diff);
-  d.setUTCHours(0, 0, 0, 0);
-  return Math.floor(d.getTime() / 1000);
-}
-
-function computeStats(climbs: LogClimb[]) {
-  const totalClimbs = climbs.length;
-  const sessions = climbs.flatMap((c) => c.sessions);
-  const totalSessionCount = sessions.length;
-
-  // A climb is "sent" if any session was sent
-  const sentClimbs = climbs.filter((c) => c.sessions.some((s) => s.sent));
-  const sendRate = totalClimbs > 0 ? sentClimbs.length / totalClimbs : 0;
-
-  // Flash: first session, 1 attempt, sent
-  const flashedClimbs = climbs.filter((c) => {
-    const sorted = [...c.sessions].sort((a, b) => a.timestamp - b.timestamp);
-    return sorted.length > 0 && sorted[0].sent && sorted[0].attempts === 1;
-  });
-  const flashRate = totalClimbs > 0 ? flashedClimbs.length / totalClimbs : 0;
-
-  // Average attempts to first send (only for sent climbs)
-  const attemptsToSend = sentClimbs.map((c) => {
-    const sorted = [...c.sessions].sort((a, b) => a.timestamp - b.timestamp);
-    const firstSendIdx = sorted.findIndex((s) => s.sent);
-    return sorted.slice(0, firstSendIdx + 1).reduce((sum, s) => sum + s.attempts, 0);
-  });
-  const avgAttemptsToSend =
-    attemptsToSend.length > 0
-      ? attemptsToSend.reduce((a, b) => a + b, 0) / attemptsToSend.length
-      : 0;
-
-  // Unique climbing days
-  const daySet = new Set(sessions.map((s) => dateKey(s.timestamp)));
-  const climbingDays = daySet.size;
-
-  // Grade pyramid
-  const gradeMap = new Map<string, { total: number; sent: number }>();
-  for (const c of climbs) {
-    const entry = gradeMap.get(c.grade) ?? { total: 0, sent: 0 };
-    entry.total++;
-    if (c.sessions.some((s) => s.sent)) entry.sent++;
-    gradeMap.set(c.grade, entry);
-  }
-  const gradePyramid: GradeStat[] = GRADES.filter((g) => gradeMap.has(g)).map(
-    (g) => ({ grade: g, ...gradeMap.get(g)! })
-  );
-
-  // Weekly activity heatmap
-  const weekData = new Map<number, { days: Set<string>; attempts: number; sends: number }>();
-  for (const c of climbs) {
-    for (const s of c.sessions) {
-      const monday = mondayOfWeek(s.timestamp);
-      const entry = weekData.get(monday) ?? { days: new Set(), attempts: 0, sends: 0 };
-      entry.days.add(dateKey(s.timestamp));
-      entry.attempts += s.attempts;
-      if (s.sent) entry.sends++;
-      weekData.set(monday, entry);
-    }
-  }
-  // Fill in gaps so empty weeks still show
-  const allMondays = Array.from(weekData.keys()).sort((a, b) => a - b);
-  const weeklyActivity: WeekBucket[] = [];
-  if (allMondays.length > 0) {
-    const first = allMondays[0];
-    const last = allMondays[allMondays.length - 1];
-    for (let m = first; m <= last; m += 7 * 86400) {
-      const d = weekData.get(m);
-      weeklyActivity.push({
-        weekStart: m,
-        sessions: d?.days.size ?? 0,
-        attempts: d?.attempts ?? 0,
-        sends: d?.sends ?? 0,
-      });
-    }
-  }
-
-  // Cap heatmap to most recent weeks
-  const recentWeeks = weeklyActivity.length > HEATMAP_MAX_WEEKS
-    ? weeklyActivity.slice(-HEATMAP_MAX_WEEKS)
-    : weeklyActivity;
-
-  return {
-    totalClimbs,
-    totalSessionCount,
-    sendRate,
-    flashRate,
-    avgAttemptsToSend,
-    climbingDays,
-    gradePyramid,
-    recentWeeks,
-  };
-}
-
-// ─── Stats Panel ─────────────────────────────────────────────────────────────
-
-function StatCard({ value, label }: { value: string; label: string }) {
-  return (
-    <div className="flex flex-col rounded-lg bg-gray-50 dark:bg-gray-800/50 px-3.5 py-3">
-      <span className="text-2xl font-bold tracking-tight">{value}</span>
-      <span className="text-xs text-gray-500 dark:text-gray-400">{label}</span>
-    </div>
-  );
-}
-
-function WeeklyHeatmap({ weeks }: { weeks: WeekBucket[] }) {
-  const [hovered, setHovered] = useState<number | null>(null);
-
-  if (weeks.length === 0) return null;
-
-  // Resting summary: total weeks visualized + avg sessions per active week.
-  const activeWeeks = weeks.filter((w) => w.sessions > 0).length;
-  const totalSessions = weeks.reduce((sum, w) => sum + w.sessions, 0);
-  const avgPerWeek = activeWeeks > 0 ? (totalSessions / activeWeeks).toFixed(1) : "0";
-
-  // Activity score: attempts are the primary driver of volume; gym days add a
-  // small bonus so a day with many short sessions still registers higher than
-  // a single casual visit with the same attempt count.
-  function activityScore(w: WeekBucket): number {
-    return w.attempts + w.sessions * 3;
-  }
-  const maxScore = Math.max(...weeks.map(activityScore));
-
-  function intensity(w: WeekBucket): string {
-    const score = activityScore(w);
-    if (score === 0) return "bg-gray-100 dark:bg-gray-800";
-    const ratio = score / maxScore;
-    if (ratio <= 0.33) return "bg-green-200 dark:bg-green-900";
-    if (ratio <= 0.66) return "bg-green-400 dark:bg-green-700";
-    return "bg-green-600 dark:bg-green-500";
-  }
-
-  function weekRange(epochSeconds: number): string {
-    const start = new Date(epochSeconds * 1000);
-    const end = new Date((epochSeconds + 6 * 86400) * 1000);
-    const fmt = (d: Date) =>
-      d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    return `${fmt(start)} – ${fmt(end)}`;
-  }
-
-  const hoveredWeek = hovered !== null ? weeks.find((w) => w.weekStart === hovered) : null;
-
-  return (
-    <div>
-      <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-3">
-        Weekly Activity
-      </h3>
-      <div className="flex flex-wrap gap-1">
-        {weeks.map((w) => (
-          <div
-            key={w.weekStart}
-            className={`w-4 h-4 rounded-sm ${intensity(w)} transition-colors cursor-default`}
-            onMouseEnter={() => setHovered(w.weekStart)}
-            onMouseLeave={() => setHovered(null)}
-          />
-        ))}
-      </div>
-
-      {/* Tooltip / detail area */}
-      <div className="mt-3 min-h-[3.5rem]">
-        {hoveredWeek && hoveredWeek.sessions > 0 ? (
-          <div className="text-xs text-gray-600 dark:text-gray-300 space-y-0.5">
-            <p className="font-medium">{weekRange(hoveredWeek.weekStart)}</p>
-            <p className="text-gray-500 dark:text-gray-400">
-              {hoveredWeek.sessions} session{hoveredWeek.sessions !== 1 ? "s" : ""}
-              {" · "}
-              {hoveredWeek.attempts} attempt{hoveredWeek.attempts !== 1 ? "s" : ""}
-              {" · "}
-              {hoveredWeek.sends} send{hoveredWeek.sends !== 1 ? "s" : ""}
-            </p>
-          </div>
-        ) : hoveredWeek ? (
-          <p className="text-xs text-gray-400 dark:text-gray-500">
-            {weekRange(hoveredWeek.weekStart)} — Rest week
-          </p>
-        ) : (
-          <p className="text-xs text-gray-400 dark:text-gray-500">
-            {weeks.length} week{weeks.length !== 1 ? "s" : ""} · {avgPerWeek} sessions/week avg
-          </p>
-        )}
-      </div>
-
-    </div>
-  );
-}
-
-function StatsPanel({ stats }: { stats: ReturnType<typeof computeStats> }) {
-  return (
-    <div className="flex flex-col gap-8">
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 gap-4">
-        <StatCard
-          value={`${Math.round(stats.sendRate * 100)}%`}
-          label="Send rate"
-        />
-        <StatCard
-          value={`${Math.round(stats.flashRate * 100)}%`}
-          label="Flash rate"
-        />
-        <StatCard
-          value={stats.avgAttemptsToSend > 0 ? stats.avgAttemptsToSend.toFixed(1) : "—"}
-          label="Avg attempts to send"
-        />
-        <StatCard value={`${stats.climbingDays}`} label="Climbing days" />
-      </div>
-
-      {/* Grade pyramid */}
-      <div>
-        <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-3">
-          Grade Pyramid
-        </h3>
-        <div className="flex flex-col gap-2.5">
-          {stats.gradePyramid.map((g) => (
-            <div key={g.grade} className="flex items-center gap-2">
-              <span
-                className={`text-xs font-medium w-14 shrink-0 px-1.5 py-0.5 rounded-full text-center ${
-                  GRADE_COLORS[g.grade] ?? "text-gray-600 bg-gray-100"
-                } ${GRADE_COLORS_DARK[g.grade] ?? ""}`}
-              >
-                {g.grade}
-              </span>
-              {/* Tally: filled square per send, outlined per project */}
-              <div className="flex-1 flex flex-wrap gap-1 items-center">
-                {Array.from({ length: g.sent }).map((_, i) => (
-                  <span
-                    key={`s${i}`}
-                    className="w-2.5 h-2.5 rounded-sm bg-green-500 dark:bg-green-500"
-                  />
-                ))}
-                {Array.from({ length: g.total - g.sent }).map((_, i) => (
-                  <span
-                    key={`p${i}`}
-                    className="w-2.5 h-2.5 rounded-sm border border-gray-300 dark:border-gray-600 box-border"
-                  />
-                ))}
-              </div>
-              <span className="text-xs text-gray-500 dark:text-gray-400 w-11 text-right shrink-0 font-mono tabular-nums">
-                {g.sent}/{g.total}
-              </span>
-            </div>
-          ))}
-        </div>
-        {/* Tally legend */}
-        <div className="flex items-center gap-3 mt-3 text-xs text-gray-400 dark:text-gray-500">
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-sm bg-green-500 dark:bg-green-500" />
-            Sent
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-sm border border-gray-300 dark:border-gray-600 box-border" />
-            Project
-          </span>
-        </div>
-      </div>
-
-      {/* Weekly activity heatmap */}
-      <WeeklyHeatmap weeks={stats.recentWeeks} />
-    </div>
-  );
-}
+const BAND_HEIGHT = 36;
+const NARROW_QUERY = "(max-width: 639px)";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function flattenClimbs(climbs: LogClimb[]): SessionRow[] {
-  return climbs.flatMap((climb) => {
-    // Sort once per climb so sendLabel doesn't re-sort per row.
-    const sorted = [...climb.sessions].sort((a, b) => a.timestamp - b.timestamp);
-    const climbSent = climb.sessions.some((s) => s.sent);
-    return climb.sessions.map((session) => {
-      const idx = sorted.findIndex((s) => s.id === session.id);
-      const label = computeLabel(session, idx, sorted);
-      return {
-        climbId: climb.id,
-        sessionId: session.id,
-        name: climb.name,
-        board: climb.board,
-        grade: climb.grade,
-        timestamp: session.timestamp,
-        attempts: session.attempts,
-        incline: session.incline,
-        location: session.location,
-        climbSent,
-        label,
-        notes: session.notes,
-      };
-    });
-  });
-}
-
-function computeLabel(session: LogSession, idx: number, sortedSessions: LogSession[]): SendLabel {
-  if (!session.sent) return "Project";
-  const previouslySent = sortedSessions.slice(0, idx).some((s) => s.sent);
-  if (previouslySent) return "Repeat";
-  if (session.attempts === 1 && idx === 0) return "Flash";
-  if (session.attempts === 1) return "Day flash";
-  return "Sent";
-}
+const plural = (n: number, word: string) => `${n} ${word}${n !== 1 ? "s" : ""}`;
 
 function dateKey(timestamp: number): string {
   return new Date(timestamp * 1000).toLocaleDateString("en-US", {
@@ -436,494 +82,548 @@ function shortDate(timestamp: number): string {
   });
 }
 
-function groupByDate(rows: SessionRow[]): [string, SessionRow[]][] {
-  const map = new Map<string, SessionRow[]>();
-  for (const row of rows) {
-    const key = dateKey(row.timestamp);
-    const group = map.get(key);
-    if (group) group.push(row);
-    else map.set(key, [row]);
+const boardShort = (board: string) => BOARD_SHORT_NAMES[board as keyof typeof BOARD_SHORT_NAMES] ?? board;
+const locationShort = (location: string) =>
+  LOCATION_SHORT_NAMES[location as keyof typeof LOCATION_SHORT_NAMES] ?? location;
+
+const chronological = (sessions: LogSession[]) => [...sessions].sort((a, b) => a.timestamp - b.timestamp);
+
+function labelFor(session: LogSession, sorted: LogSession[]): SendLabel {
+  const idx = sorted.findIndex((s) => s.id === session.id);
+  return computeSessionLabel({
+    sent: session.sent,
+    attempts: session.attempts,
+    sessionIndex: idx,
+    priorSentInClimb: sorted.slice(0, idx).some((s) => s.sent),
+  });
+}
+
+function flattenClimbs(climbs: LogClimb[]): SessionRow[] {
+  return climbs
+    .flatMap((climb) => {
+      const sorted = chronological(climb.sessions);
+      const climbSent = climb.sessions.some((s) => s.sent);
+      return climb.sessions.map((session) => ({
+        key: `${climb.id}-${session.id}`,
+        climb,
+        session,
+        label: labelFor(session, sorted),
+        climbSent,
+      }));
+    })
+    .sort((a, b) => b.session.timestamp - a.session.timestamp);
+}
+
+function computeStats(climbs: LogClimb[]) {
+  const sessions = climbs.flatMap((c) => c.sessions);
+  const points: ChartPoint[] = climbs.map((climb) => {
+    const sorted = chronological(climb.sessions);
+    const sendIdx = sorted.findIndex((s) => s.sent);
+    const isSent = sendIdx >= 0;
+    const upToSend = isSent ? sorted.slice(0, sendIdx + 1) : sorted;
+    return {
+      id: climb.id,
+      name: climb.name,
+      grade: climb.grade,
+      board: climb.board,
+      timestamp: isSent ? sorted[sendIdx].timestamp : sorted[sorted.length - 1].timestamp,
+      kind: !isSent ? "project" : sorted[0].sent && sorted[0].attempts === 1 ? "flash" : "sent",
+      attempts: upToSend.reduce((n, s) => n + s.attempts, 0),
+      sessionCount: upToSend.length,
+    };
+  });
+  const sent = points.filter((p) => p.kind !== "project");
+  const flashCount = points.filter((p) => p.kind === "flash").length;
+  return {
+    total: climbs.length,
+    days: new Set(sessions.map((s) => dateKey(s.timestamp))).size,
+    sentCount: sent.length,
+    flashCount,
+    flashRate: climbs.length ? flashCount / climbs.length : 0,
+    avgAttempts: sent.length ? sent.reduce((n, p) => n + p.attempts, 0) / sent.length : 0,
+    hardest: [...GRADES].reverse().find((g) => sent.some((p) => p.grade === g)),
+    points,
+  };
+}
+
+function useIsNarrow(): boolean {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(NARROW_QUERY);
+    const update = () => setNarrow(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  return narrow;
+}
+
+// ─── Chart ────────────────────────────────────────────────────────────────────
+
+function SendChart({ stats }: { stats: ReturnType<typeof computeStats> }) {
+  const narrow = useIsNarrow();
+  const [hoverId, setHoverId] = useState<number | null>(null);
+  const { points } = stats;
+
+  const bandGrades = [...GRADES].reverse().filter((g) => points.some((p) => p.grade === g));
+  const bandIndex = Object.fromEntries(bandGrades.map((g, i) => [g, i]));
+  const tMin = Math.min(...points.map((p) => p.timestamp));
+  const tMax = Math.max(...points.map((p) => p.timestamp));
+  const span = Math.max(1, tMax - tMin);
+  const xPct = (t: number) => 4 + ((t - tMin) / span) * 92;
+
+  // Spread out dots that share a day and grade so they don't overlap.
+  const counts: Record<string, number> = {};
+  points.forEach((p) => {
+    const k = dateKey(p.timestamp) + p.grade;
+    counts[k] = (counts[k] ?? 0) + 1;
+  });
+  const seen: Record<string, number> = {};
+  const dots = [...points]
+    .sort((a, b) => a.timestamp - b.timestamp)
+    .map((p) => {
+      const k = dateKey(p.timestamp) + p.grade;
+      const n = (seen[k] = (seen[k] ?? 0) + 1);
+      const offset = (n - 1 - (counts[k] - 1) / 2) * (narrow ? 8 : 13);
+      return { p, left: `max(7px, min(calc(${xPct(p.timestamp).toFixed(2)}% + ${offset}px), calc(100% - 7px)))` };
+    });
+
+  const months: { left: string; label: string }[] = [];
+  const d = new Date(tMin * 1000);
+  d.setDate(1);
+  d.setMonth(d.getMonth() + 1);
+  d.setHours(0, 0, 0, 0);
+  for (let i = 0; d.getTime() / 1000 <= tMax; i++, d.setMonth(d.getMonth() + 1)) {
+    if (!narrow || i % 2 === 0) {
+      months.push({
+        left: `${xPct(d.getTime() / 1000).toFixed(2)}%`,
+        label: d.toLocaleDateString("en-US", { month: "short" }),
+      });
+    }
   }
-  return Array.from(map.entries());
-}
 
-function totalSessions(climbs: LogClimb[]): number {
-  const daySet = new Set(
-    climbs.flatMap((c) => c.sessions.map((s) => dateKey(s.timestamp)))
-  );
-  return daySet.size;
-}
-
-// Tailwind class bundles per send-label. Flash gets the loudest treatment
-// (filled pill), Day flash stays as plain bold text, Sent/Repeat become
-// outlined pills, Project is a muted gray text label.
-const LABEL_STYLES: Record<SendLabel, string> = {
-  "Flash":
-    "inline-block px-2.5 py-0.5 rounded-full text-xs font-bold tracking-wide " +
-    "bg-green-500 text-white dark:bg-green-500 dark:text-white " +
-    "ring-2 ring-green-500/20",
-  "Day flash":
-    "text-sm font-semibold text-green-600 dark:text-green-400",
-  "Sent":
-    "inline-block px-2 py-0.5 rounded-full text-xs font-semibold " +
-    "border border-green-600 text-green-600 " +
-    "dark:border-green-400 dark:text-green-400",
-  "Repeat":
-    "inline-block px-2 py-0.5 rounded-full text-xs font-semibold " +
-    "border border-blue-600 text-blue-600 " +
-    "dark:border-blue-400 dark:text-blue-400",
-  "Project":
-    "text-sm font-medium text-gray-400 dark:text-gray-500",
-};
-
-// ─── Filter Bar ───────────────────────────────────────────────────────────────
-
-const PILL_ACTIVE = "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900";
-const PILL_INACTIVE =
-  "bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700";
-
-// A row of single-select pills with an "all" option. Hidden when there is
-// only one value to choose from, since filtering would be a no-op.
-function OptionPills({
-  allLabel,
-  options,
-  selected,
-  onChange,
-  label,
-}: {
-  allLabel: string;
-  options: string[];
-  selected: string;
-  onChange: (v: string) => void;
-  label: (v: string) => string;
-}) {
-  if (options.length < 2) return null;
-  return (
-    <div className="flex flex-wrap gap-2">
-      <button
-        onClick={() => onChange("all")}
-        className={`text-xs font-medium px-2.5 py-1 rounded-full transition-colors ${
-          selected === "all" ? PILL_ACTIVE : PILL_INACTIVE
-        }`}
-      >
-        {allLabel}
-      </button>
-      {options.map((o) => (
-        <button
-          key={o}
-          onClick={() => onChange(o === selected ? "all" : o)}
-          className={`text-xs font-medium px-2.5 py-1 rounded-full transition-colors ${
-            o === selected ? PILL_ACTIVE : PILL_INACTIVE
-          }`}
-        >
-          {label(o)}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function FilterBar({
-  grades,
-  selectedGrade,
-  onGradeChange,
-  boards,
-  selectedBoard,
-  onBoardChange,
-  locations,
-  selectedLocation,
-  onLocationChange,
-  status,
-  onStatusChange,
-}: {
-  grades: string[];
-  selectedGrade: string;
-  onGradeChange: (g: string) => void;
-  boards: string[];
-  selectedBoard: string;
-  onBoardChange: (b: string) => void;
-  locations: string[];
-  selectedLocation: string;
-  onLocationChange: (l: string) => void;
-  status: StatusFilter;
-  onStatusChange: (s: StatusFilter) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-2 flex-1">
-      {/* Grade pills */}
-      <div className="flex flex-wrap gap-2">
-        <button
-          onClick={() => onGradeChange("all")}
-          className={`text-xs font-medium px-2.5 py-1 rounded-full transition-colors ${
-            selectedGrade === "all"
-              ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
-              : "bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-          }`}
-        >
-          All Grades
-        </button>
-        {grades.map((grade) => (
-          <button
-            key={grade}
-            onClick={() => onGradeChange(grade === selectedGrade ? "all" : grade)}
-            className={`text-xs font-medium px-2.5 py-1 rounded-full transition-colors ${
-              grade === selectedGrade
-                ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
-                : `${GRADE_COLORS[grade]} ${GRADE_COLORS_DARK[grade]}`
-            }`}
-          >
-            {grade}
-          </button>
-        ))}
-      </div>
-
-      <OptionPills
-        allLabel="All Boards"
-        options={boards}
-        selected={selectedBoard}
-        onChange={onBoardChange}
-        label={(b) => BOARD_SHORT_NAMES[b as keyof typeof BOARD_SHORT_NAMES] ?? b}
-      />
-
-      <OptionPills
-        allLabel="All Gyms"
-        options={locations}
-        selected={selectedLocation}
-        onChange={onLocationChange}
-        label={(l) => LOCATION_SHORT_NAMES[l] ?? l}
-      />
-
-      {/* Status pills */}
-      <div className="flex flex-wrap gap-2">
-        {(["all", "sent", "project"] as const).map((s) => (
-          <button
-            key={s}
-            onClick={() => onStatusChange(s)}
-            className={`text-xs font-medium px-2.5 py-1 rounded-full transition-colors capitalize ${
-              status === s
-                ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
-                : "bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-            }`}
-          >
-            {s === "all" ? "All Status" : s === "sent" ? "Sent" : "Project"}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── Expanded Climb Detail ────────────────────────────────────────────────────
-
-function ClimbHistory({ climb, activeSessionId }: { climb: LogClimb; activeSessionId: number }) {
-  // Sort chronologically once for label computation, then reverse for display.
-  const chronological = [...climb.sessions].sort((a, b) => a.timestamp - b.timestamp);
-  const sorted = [...chronological].reverse();
-  const totalAttempts = sorted.reduce((sum, s) => sum + s.attempts, 0);
-  const everSent = sorted.some((s) => s.sent);
+  const hovered = points.find((p) => p.id === hoverId);
+  const detail = hovered
+    ? hovered.kind === "project"
+      ? `Project · ${plural(hovered.attempts, "attempt")} over ${plural(hovered.sessionCount, "session")} · last tried ${shortDate(hovered.timestamp)}`
+      : `${hovered.kind === "flash" ? "Flashed" : "Sent"} ${shortDate(hovered.timestamp)} · ${plural(hovered.attempts, "attempt")} over ${plural(hovered.sessionCount, "session")} · ${boardShort(hovered.board)}`
+    : narrow
+      ? "Tap a dot for details"
+      : "Hover a dot for details";
 
   return (
-    <motion.div
-      initial={{ height: 0, opacity: 0 }}
-      animate={{ height: "auto", opacity: 1 }}
-      exit={{ height: 0, opacity: 0 }}
-      transition={{ duration: 0.25, ease: "easeInOut" }}
-      className="overflow-hidden"
-    >
-      <div className="px-4 pb-4 pt-1">
-        <div className="rounded-lg bg-gray-50 dark:bg-gray-800/50 p-3">
-          {/* Summary line */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400 mb-2.5">
-            <span>{sorted.length} session{sorted.length !== 1 ? "s" : ""}</span>
-            <span className="text-gray-300 dark:text-gray-600">·</span>
-            <span>{totalAttempts} total attempt{totalAttempts !== 1 ? "s" : ""}</span>
-            <span className="text-gray-300 dark:text-gray-600">·</span>
-            <span className={everSent ? "text-green-600 dark:text-green-400" : ""}>
-              {everSent ? "Sent" : "Project"}
-            </span>
+    <>
+      <div className="flex flex-col gap-2.5">
+        <div className="flex gap-3">
+          <div className="flex flex-[0_0_64px] flex-col">
+            {bandGrades.map((g) => (
+              <div key={g} className="mono flex h-9 items-center gap-1.5 text-xs text-[#525252]">
+                <span className="size-1.5 rounded-full" style={{ background: GRADE_COLORS[g] }} />
+                {g}
+              </div>
+            ))}
           </div>
-
-          {/* Session list */}
-          <div className="flex flex-col gap-1">
-            {sorted.map((session) => {
-              const isActive = session.id === activeSessionId;
-              const idx = chronological.findIndex((s) => s.id === session.id);
-              const label = computeLabel(session, idx, chronological);
-              return (
-                <div
-                  key={session.id}
-                  className={`flex items-center justify-between text-sm px-2.5 py-1.5 rounded-md transition-colors ${
-                    isActive
-                      ? label === "Repeat"
-                        ? "bg-blue-100 dark:bg-blue-900/40"
-                        : session.sent
-                          ? "bg-green-100 dark:bg-green-900/40"
-                          : "bg-gray-200/70 dark:bg-gray-700/50"
-                      : ""
-                  }`}
-                >
-                  <span className={isActive ? "font-medium text-gray-900 dark:text-gray-100" : "text-gray-600 dark:text-gray-300"}>
-                    {shortDate(session.timestamp)}
-                  </span>
-                  <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">
-                    <span>{session.attempts} attempt{session.attempts !== 1 ? "s" : ""}</span>
-                    <span className="w-16 text-right">
-                      <span className={LABEL_STYLES[label]}>{label}</span>
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="relative min-w-0 flex-1" style={{ height: bandGrades.length * BAND_HEIGHT }}>
+            {bandGrades.map((g, i) => (
+              <div
+                key={g}
+                className="absolute inset-x-0 h-px bg-[#f0f0f0]"
+                style={{ top: i * BAND_HEIGHT + BAND_HEIGHT / 2 }}
+              />
+            ))}
+            {dots.map(({ p, left }) => (
+              <div
+                key={p.id}
+                onMouseEnter={() => setHoverId(p.id)}
+                onMouseLeave={() => setHoverId(null)}
+                onClick={() => setHoverId(p.id)}
+                className="absolute -mt-[5.5px] -ml-[5.5px] size-[11px] rounded-full transition-transform duration-[120ms]"
+                style={{
+                  left,
+                  top: bandIndex[p.grade] * BAND_HEIGHT + BAND_HEIGHT / 2,
+                  background: p.kind === "project" ? "#ffffff" : "#16a34a",
+                  border: p.kind === "project" ? "1.5px solid #a3a3a3" : 0,
+                  boxShadow: p.kind === "flash" ? "0 0 0 3px rgba(22,163,74,0.22)" : "none",
+                  transform: hoverId === p.id ? "scale(1.5)" : "scale(1)",
+                }}
+              />
+            ))}
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <div className="flex-[0_0_64px]" />
+          <div className="relative h-4 min-w-0 flex-1 border-t border-[#e5e5e5]">
+            {months.map((m) => (
+              <span
+                key={m.left}
+                className="mono absolute top-1.5 text-[11px] whitespace-nowrap text-[#a3a3a3]"
+                style={{ left: m.left }}
+              >
+                {m.label}
+              </span>
+            ))}
           </div>
         </div>
       </div>
-    </motion.div>
+      <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-3 pt-1">
+        <div className="flex flex-wrap gap-x-5 gap-y-2 text-[13px] text-[#525252]">
+          <LegendItem
+            label="Flash"
+            count={stats.flashCount}
+            style={{ background: "#16a34a", boxShadow: "0 0 0 3px rgba(22,163,74,0.22)" }}
+          />
+          <LegendItem label="Sent" count={stats.sentCount - stats.flashCount} style={{ background: "#16a34a" }} />
+          <LegendItem
+            label="Project"
+            count={stats.total - stats.sentCount}
+            style={{ border: "1.5px solid #a3a3a3" }}
+          />
+        </div>
+        <div className="flex min-h-5 flex-col gap-0.5 text-[13px]">
+          <span className="font-medium">
+            {hovered ? `${hovered.name} · ${hovered.grade}` : "Every problem, by grade and date"}
+          </span>
+          <span className="text-[#737373]">{detail}</span>
+        </div>
+      </div>
+    </>
   );
 }
 
-// ─── View ─────────────────────────────────────────────────────────────────────
+function LegendItem({ label, count, style }: { label: string; count: number; style: React.CSSProperties }) {
+  return (
+    <span className="flex items-center gap-[7px]">
+      <span className="box-border size-[11px] rounded-full" style={style} />
+      {label} <span className="mono text-[#a3a3a3]">{count}</span>
+    </span>
+  );
+}
 
-export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null }) {
-  const [gradeFilter, setGradeFilter] = useState<string>("all");
-  const [boardFilter, setBoardFilter] = useState<string>("all");
-  const [locationFilter, setLocationFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [expandedClimb, setExpandedClimb] = useState<string | null>(null);
-  const [expandedNotesKey, setExpandedNotesKey] = useState<string | null>(null);
+// ─── Filters ──────────────────────────────────────────────────────────────────
 
-  const stats = useMemo(() => (climbs ? computeStats(climbs) : null), [climbs]);
+interface FilterOption {
+  value: string;
+  label: string;
+  dot?: string;
+  board?: string;
+}
 
-  // Build a lookup from climb name to climb data (for expand)
-  const climbMap = useMemo(() => {
-    if (!climbs) return new Map<number, LogClimb>();
-    return new Map(climbs.map((c) => [c.id, c]));
-  }, [climbs]);
+function FilterGroup({
+  label,
+  options,
+  selected,
+  onSelect,
+}: {
+  label: string;
+  options: FilterOption[];
+  selected: string;
+  onSelect: (value: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="mono mr-0.5 text-[11px] tracking-[0.06em] text-[#a3a3a3] uppercase">{label}</span>
+      {options.map((o) => {
+        const active = selected === o.value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onSelect(active && o.value !== "all" ? "all" : o.value)}
+            className={`flex h-7 cursor-pointer items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium ${
+              active ? "border-[#0a0a0a] bg-[#0a0a0a] text-white" : "border-[#e5e5e5] bg-white text-[#404040]"
+            }`}
+          >
+            {o.dot && <span className="size-1.5 rounded-full" style={{ background: o.dot }} />}
+            {o.board && <BoardLogo board={o.board} inverted={active} />}
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
-  // Available grades in the data
-  const availableGrades = useMemo(() => {
-    if (!climbs) return [];
-    const gradeSet = new Set(climbs.map((c) => c.grade));
-    return GRADES.filter((g) => gradeSet.has(g));
-  }, [climbs]);
+// ─── Session list ─────────────────────────────────────────────────────────────
 
-  // Available boards and locations in the data, in canonical order.
-  const availableBoards = useMemo(() => {
-    if (!climbs) return [];
-    const boardSet = new Set(climbs.map((c) => c.board));
-    return BOARDS.filter((b) => boardSet.has(b));
-  }, [climbs]);
-
-  const availableLocations = useMemo(() => {
-    if (!climbs) return [];
-    const locationSet = new Set(climbs.flatMap((c) => c.sessions.map((s) => s.location)));
-    return LOCATIONS.filter((l) => locationSet.has(l));
-  }, [climbs]);
-
-  // Flatten + sort once when climbs change (not on every filter toggle).
-  const allRows = useMemo(() => {
-    if (!climbs) return [];
-    return flattenClimbs(climbs).sort((a, b) => b.timestamp - a.timestamp);
-  }, [climbs]);
-
-  // Apply filters (cheap subset of the pre-sorted array).
-  const filtered = useMemo(() => {
-    let rows = allRows;
-    if (gradeFilter !== "all") {
-      rows = rows.filter((r) => r.grade === gradeFilter);
-    }
-    if (boardFilter !== "all") {
-      rows = rows.filter((r) => r.board === boardFilter);
-    }
-    if (locationFilter !== "all") {
-      rows = rows.filter((r) => r.location === locationFilter);
-    }
-    if (statusFilter === "sent") {
-      rows = rows.filter((r) => r.climbSent);
-    } else if (statusFilter === "project") {
-      rows = rows.filter((r) => !r.climbSent);
-    }
-    return rows;
-  }, [allRows, gradeFilter, boardFilter, locationFilter, statusFilter]);
-
-  const groups = useMemo(() => groupByDate(filtered), [filtered]);
-
-  const toggleExpand = (key: string) => {
-    setExpandedClimb((prev) => (prev === key ? null : key));
-  };
-
-  const toggleNotes = (key: string) => {
-    setExpandedNotesKey((prev) => (prev === key ? null : key));
-  };
+function SessionRowView({
+  row,
+  expanded,
+  notesOpen,
+  onToggleExpanded,
+  onToggleNotes,
+}: {
+  row: SessionRow;
+  expanded: boolean;
+  notesOpen: boolean;
+  onToggleExpanded: () => void;
+  onToggleNotes: () => void;
+}) {
+  const { climb, session } = row;
+  const hasHistory = climb.sessions.length > 1;
+  const chron = chronological(climb.sessions);
+  const totalAttempts = chron.reduce((n, s) => n + s.attempts, 0);
 
   return (
-    <main className="min-h-screen px-4 py-8 sm:py-12">
-      <div className="max-w-5xl mx-auto flex flex-col lg:flex-row gap-8 lg:gap-10 lg:items-start">
-        {/* Sidebar: header + stats — sticky on desktop */}
-        <motion.aside
-          className="w-full lg:w-72 shrink-0 lg:sticky lg:top-8"
-          {...fadeDown}
-          transition={{ duration: 0.6, delay: 0.1 }}
-        >
-          <div className="mb-6 sm:mb-8">
-            <Link href="/" className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
-              ← back
-            </Link>
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mt-3">Climbing Log</h1>
-            {climbs === null ? (
-              <p className="text-gray-400 mt-1 text-sm">Unavailable right now.</p>
-            ) : (
-              <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">
-                {(() => { const s = totalSessions(climbs); return <>{climbs.length} problem{climbs.length !== 1 ? "s" : ""} · {s} session{s !== 1 ? "s" : ""}</>; })()}
-              </p>
+    <div className={`flex flex-col rounded-[10px] ${expanded ? "bg-[#fafafa]" : ""}`}>
+      <div
+        onClick={hasHistory ? onToggleExpanded : undefined}
+        className={`flex items-center gap-3 rounded-[10px] p-3 hover:bg-[#fafafa] ${hasHistory ? "cursor-pointer" : ""}`}
+      >
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="truncate text-base font-medium">{climb.name}</span>
+            {hasHistory && (
+              <span className="mono shrink-0 rounded-full border border-[#e5e5e5] px-[7px] py-px text-[11px] text-[#737373]">
+                {climb.sessions.length}×
+              </span>
             )}
-          </div>
-
-          {climbs !== null && <StatsPanel stats={stats!} />}
-        </motion.aside>
-
-        {/* Log column */}
-        {climbs !== null && (
-          <div className="flex-1 min-w-0">
-            <motion.div className="flex items-center gap-3 mb-6" {...fadeDown} transition={{ duration: 0.6, delay: 0.15 }}>
-              <FilterBar
-                grades={availableGrades}
-                selectedGrade={gradeFilter}
-                onGradeChange={setGradeFilter}
-                boards={availableBoards}
-                selectedBoard={boardFilter}
-                onBoardChange={setBoardFilter}
-                locations={availableLocations}
-                selectedLocation={locationFilter}
-                onLocationChange={setLocationFilter}
-                status={statusFilter}
-                onStatusChange={setStatusFilter}
-              />
-              <a
-                href="https://github.com/masonmill/climbinglog"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="shrink-0 opacity-40 hover:opacity-80 transition-opacity"
-                aria-label="GitHub"
+            {session.notes && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleNotes();
+                }}
+                className="shrink-0 cursor-pointer text-xs text-[#737373] underline underline-offset-2"
               >
-                <Image src="/github.svg" alt="GitHub" width={16} height={16} className="svg-icon" />
-              </a>
-            </motion.div>
-
-            {filtered.length === 0 ? (
-              <p className="text-gray-400 text-sm text-center py-12">No sessions match the current filters.</p>
-            ) : (
-              <>
-              <motion.div className="flex flex-col gap-6 sm:gap-8" {...staggerList}>
-                {groups.map(([date, dayRows]) => (
-                  <motion.div key={date} {...fadeUp}>
-                    <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-3">
-                      <span>{date}</span>
-                      <span className="text-gray-300 dark:text-gray-600 normal-case tracking-normal">
-                        · {LOCATION_SHORT_NAMES[dayRows[0].location] ?? dayRows[0].location}
-                      </span>
-                    </p>
-                    <div className="flex flex-col rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden">
-                      {dayRows.map((row, i) => {
-                        const key = `${row.climbId}-${row.sessionId}`;
-                        const isExpanded = expandedClimb === key;
-                        const climb = climbMap.get(row.climbId);
-                        const hasHistory = climb && climb.sessions.length > 1;
-                        const hasNotes = row.notes !== undefined && row.notes.length > 0;
-                        const notesExpanded = expandedNotesKey === key;
-
-                        return (
-                          <div
-                            key={key}
-                            className={i < dayRows.length - 1 ? "border-b border-gray-100 dark:border-gray-800" : ""}
-                          >
-                            <div
-                              className={`flex items-start justify-between gap-3 sm:gap-4 px-3 sm:px-4 py-3 sm:py-4 ${
-                                hasHistory ? "cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors" : ""
-                              }`}
-                              onClick={() => hasHistory && toggleExpand(key)}
-                            >
-                              <div className="flex flex-col gap-1.5 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-base sm:text-lg font-medium truncate">{row.name}</span>
-                                  {hasHistory && (
-                                    <span className={`inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full transition-colors ${
-                                      isExpanded
-                                        ? "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
-                                        : "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500"
-                                    }`}>
-                                      {climb!.sessions.length}
-                                      <ChevronDown
-                                        size={12}
-                                        className={`transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
-                                      />
-                                    </span>
-                                  )}
-                                  {hasNotes && (
-                                    <button
-                                      type="button"
-                                      aria-label={notesExpanded ? "Hide notes" : "Show notes"}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        toggleNotes(key);
-                                      }}
-                                      className={`shrink-0 rounded p-1 transition-colors ${
-                                        notesExpanded
-                                          ? "text-gray-700 dark:text-gray-200"
-                                          : "text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-                                      }`}
-                                    >
-                                      <StickyNote size={14} />
-                                    </button>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap text-sm sm:text-base text-gray-500 dark:text-gray-400">
-                                  <span
-                                    className={`text-xs font-medium px-2 py-0.5 rounded-full ${GRADE_COLORS[row.grade] ?? "text-gray-600 bg-gray-100"} ${GRADE_COLORS_DARK[row.grade] ?? ""}`}
-                                  >
-                                    {row.grade}
-                                  </span>
-                                  <span className="hidden sm:inline">{row.board}</span>
-                                  <span className="sm:hidden">{row.board.replace("MoonBoard ", "MB")}</span>
-                                  <span className="text-gray-300 dark:text-gray-600">·</span>
-                                  <span>{row.incline}°</span>
-                                  <span className="text-gray-300 dark:text-gray-600">·</span>
-                                  <span>{row.attempts} attempt{row.attempts !== 1 ? "s" : ""}</span>
-                                </div>
-                                {hasNotes && notesExpanded && (
-                                  <p
-                                    className="whitespace-pre-wrap text-sm text-gray-600 dark:text-gray-300"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    {row.notes}
-                                  </p>
-                                )}
-                              </div>
-
-                              <div className="flex flex-col items-end gap-1 shrink-0 pt-0.5">
-                                <span className={LABEL_STYLES[row.label]}>{row.label}</span>
-                              </div>
-                            </div>
-
-                            <AnimatePresence>
-                              {isExpanded && climb && (
-                                <ClimbHistory climb={climb} activeSessionId={row.sessionId} />
-                              )}
-                            </AnimatePresence>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </motion.div>
-                ))}
-              </motion.div>
-              <p className="text-center text-xs text-gray-300 dark:text-gray-700 mt-12 mb-4 select-none">
-                You&apos;ve reached the bottom. More sends coming soon.
-              </p>
-              </>
+                {notesOpen ? "Hide note" : "Note"}
+              </button>
             )}
           </div>
-        )}
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px] text-[#737373]">
+            <GradeTag grade={climb.grade} />
+            <span className="flex items-center gap-1.5">
+              <BoardLogo board={climb.board} />
+              {boardShort(climb.board)}
+            </span>
+            <span>{session.incline}°</span>
+            <span>{plural(session.attempts, "attempt")}</span>
+          </div>
+          {notesOpen && (
+            <p className="mt-1 text-sm leading-normal whitespace-pre-wrap text-[#404040]">{session.notes}</p>
+          )}
+        </div>
+        <SendLabelPill label={row.label} />
       </div>
-    </main>
+      {expanded && (
+        <div className="flex flex-col gap-0.5 px-3 pb-3">
+          <span className="pb-1.5 text-xs text-[#737373]">
+            {plural(chron.length, "session")} · {plural(totalAttempts, "total attempt")} ·{" "}
+            {row.climbSent ? "Sent" : "Project"}
+          </span>
+          {[...chron].reverse().map((s) => {
+            const lb = labelFor(s, chron);
+            const active = s.id === session.id;
+            return (
+              <div
+                key={s.id}
+                className={`flex items-center justify-between gap-3 rounded-md px-2.5 py-1.5 text-[13px] ${
+                  active ? "bg-[#f0f0f0]" : ""
+                }`}
+              >
+                <span className={`mono text-xs ${active ? "font-semibold" : ""}`}>{shortDate(s.timestamp)}</span>
+                <span className="flex items-center gap-3.5 text-[#737373]">
+                  <span>{plural(s.attempts, "attempt")}</span>
+                  <span
+                    className="w-[72px] text-right font-semibold"
+                    style={{ color: lb === "Flash" ? "#16a34a" : LABEL_STYLES[lb].color }}
+                  >
+                    {lb}
+                  </span>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null }) {
+  const [status, setStatus] = useState<StatusFilter>("all");
+  const [grade, setGrade] = useState("all");
+  const [board, setBoard] = useState("all");
+  const [gym, setGym] = useState("all");
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const [notesKey, setNotesKey] = useState<string | null>(null);
+
+  const allRows = useMemo(() => (climbs ? flattenClimbs(climbs) : []), [climbs]);
+  const stats = useMemo(() => (climbs && climbs.length ? computeStats(climbs) : null), [climbs]);
+
+  const rows = allRows.filter(
+    (r) =>
+      (grade === "all" || r.climb.grade === grade) &&
+      (board === "all" || r.climb.board === board) &&
+      (gym === "all" || r.session.location === gym) &&
+      (status === "all" || (status === "sent") === r.climbSent),
+  );
+
+  const groups: [string, SessionRow[]][] = [];
+  for (const row of rows) {
+    const k = dateKey(row.session.timestamp);
+    const last = groups[groups.length - 1];
+    if (last && last[0] === k) last[1].push(row);
+    else groups.push([k, [row]]);
+  }
+  const yearOf = (rs: SessionRow[]) => new Date(rs[0].session.timestamp * 1000).getFullYear();
+
+  const anyFilter = status !== "all" || grade !== "all" || board !== "all" || gym !== "all";
+  const withReset = (set: (v: string) => void) => (v: string) => {
+    set(v);
+    setExpandedKey(null);
+  };
+  const clearFilters = () => {
+    setStatus("all");
+    setGrade("all");
+    setBoard("all");
+    setGym("all");
+    setExpandedKey(null);
+  };
+
+  const all = climbs ?? [];
+  const gradesIn = GRADES.filter((g) => all.some((c) => c.grade === g));
+  const boardsIn = BOARDS.filter((b) => all.some((c) => c.board === b));
+  const gymsIn = LOCATIONS.filter((l) => all.some((c) => c.sessions.some((s) => s.location === l)));
+
+  const summary = climbs === null ? "Unavailable right now." : stats ? `${plural(stats.total, "problem")} · ${plural(stats.days, "session")}` : "";
+
+  return (
+    <SiteChrome>
+      <main className="mx-auto flex w-full max-w-[1040px] flex-1 flex-col gap-14 px-6 pt-[72px] pb-16">
+        <div className="reveal flex flex-col gap-3.5">
+          <span className="mono text-[13px] text-[#737373]">{summary}</span>
+          <h1 className="m-0 text-[clamp(40px,10vw,56px)] leading-none font-semibold tracking-[-0.04em]">
+            Climbing log
+          </h1>
+        </div>
+
+        {stats && (
+          <section
+            className="reveal flex flex-col gap-7 border-t border-[#0a0a0a] pt-7"
+            style={{ animationDelay: "120ms" }}
+          >
+            <p className="max-w-[820px] text-[clamp(21px,5vw,28px)] leading-[1.35] font-medium tracking-[-0.025em] text-pretty text-[#a3a3a3]">
+              <span className="text-[#0a0a0a]">
+                {stats.sentCount} of {stats.total} problems sent
+              </span>{" "}
+              over {stats.days} days on the wall. Hardest send{" "}
+              <span style={{ color: (stats.hardest && GRADE_COLORS[stats.hardest]) || "#0a0a0a" }}>
+                {stats.hardest ?? "—"}
+              </span>
+              , <span className="text-[#0a0a0a]">{Math.round(stats.flashRate * 100)}% flashed</span>,{" "}
+              {stats.avgAttempts > 0 ? stats.avgAttempts.toFixed(1) : "—"} attempts per send on average.
+            </p>
+            <SendChart stats={stats} />
+          </section>
+        )}
+
+        <section className="reveal flex flex-col" style={{ animationDelay: "320ms" }}>
+          <div className="top-16 z-[5] flex flex-col gap-2.5 border-b border-[#0a0a0a] bg-white pt-4 pb-3.5 sm:sticky">
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="text-[15px] font-semibold">Sessions</h2>
+              {climbs && (
+                <span className="flex items-center gap-3 text-[13px] text-[#737373]">
+                  <span>
+                    {plural(new Set(rows.map((r) => dateKey(r.session.timestamp))).size, "session")} ·{" "}
+                    {plural(rows.length, "climb")}
+                  </span>
+                  {anyFilter && (
+                    <button type="button" onClick={clearFilters} className="cursor-pointer text-[#0a0a0a] underline">
+                      Clear
+                    </button>
+                  )}
+                </span>
+              )}
+            </div>
+            {climbs && (
+              <div className="flex flex-wrap gap-x-5 gap-y-2">
+                <FilterGroup
+                  label="Status"
+                  selected={status}
+                  onSelect={withReset((v) => setStatus(v as StatusFilter))}
+                  options={[
+                    { value: "all", label: "All" },
+                    { value: "sent", label: "Sent" },
+                    { value: "project", label: "Project" },
+                  ]}
+                />
+                <FilterGroup
+                  label="Grade"
+                  selected={grade}
+                  onSelect={withReset(setGrade)}
+                  options={[
+                    { value: "all", label: "All" },
+                    ...gradesIn.map((g) => ({ value: g, label: g, dot: GRADE_COLORS[g] })),
+                  ]}
+                />
+                {boardsIn.length > 1 && (
+                  <FilterGroup
+                    label="Board"
+                    selected={board}
+                    onSelect={withReset(setBoard)}
+                    options={[{ value: "all", label: "All" }, ...boardsIn.map((b) => ({ value: b, label: boardShort(b), board: b }))]}
+                  />
+                )}
+                {gymsIn.length > 1 && (
+                  <FilterGroup
+                    label="Gym"
+                    selected={gym}
+                    onSelect={withReset(setGym)}
+                    options={[{ value: "all", label: "All" }, ...gymsIn.map((l) => ({ value: l, label: locationShort(l) }))]}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+
+          {groups.length === 0 && (
+            <p className="py-16 text-center text-sm text-[#a3a3a3]">
+              {climbs === null ? "Unavailable right now." : "No sessions match the current filters."}
+            </p>
+          )}
+
+          {groups.map(([k, rs], gi) => {
+            const showYear = gi === groups.length - 1 || yearOf(groups[gi + 1][1]) !== yearOf(rs);
+            return (
+              <div key={k}>
+                <div className="flex flex-wrap gap-x-8 gap-y-2 border-b border-[#f0f0f0] py-6">
+                  <div className="flex flex-[0_0_150px] flex-col gap-1 pt-3">
+                    <span className="text-[15px] font-semibold tracking-[-0.01em]">{shortDate(rs[0].session.timestamp)}</span>
+                    <span className="mono text-xs whitespace-nowrap text-[#737373]">
+                      {locationShort(rs[0].session.location)}
+                    </span>
+                  </div>
+                  <div className="flex min-w-0 flex-[1_1_480px] flex-col">
+                    {rs.map((r) => (
+                      <SessionRowView
+                        key={r.key}
+                        row={r}
+                        expanded={expandedKey === r.key}
+                        notesOpen={notesKey === r.key}
+                        onToggleExpanded={() => setExpandedKey(expandedKey === r.key ? null : r.key)}
+                        onToggleNotes={() => setNotesKey(notesKey === r.key ? null : r.key)}
+                      />
+                    ))}
+                  </div>
+                </div>
+                {showYear && (
+                  <div className="flex items-center gap-3.5 pt-7 pb-1">
+                    <span className="text-[15px] font-semibold tracking-[-0.01em]">{yearOf(rs)}</span>
+                    <span className="h-px flex-1 bg-[#e5e5e5]" />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {climbs && (
+            <p className="mt-12 text-center text-xs text-[#a3a3a3]">You&apos;ve reached the bottom. More sends coming soon.</p>
+          )}
+        </section>
+      </main>
+    </SiteChrome>
   );
 }
