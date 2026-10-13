@@ -42,7 +42,7 @@ export default function Home() {
         >
           <FadeIn>
             <p>
-              Hey! I'm Mason, Software Engineer at Apple and recent CS graduate
+              Hey! I&apos;m Mason, Software Engineer at Apple and recent CS graduate
               from the University of Michigan.
             </p>
           </FadeIn>
