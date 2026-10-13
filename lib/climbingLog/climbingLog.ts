@@ -1,22 +1,46 @@
 // ─── Types ────────────────────────────────────────────────────────────────
 
-export const BOARDS = ["MoonBoard 2019", "MoonBoard 2024"] as const;
+export const BOARDS = ["MoonBoard 2019", "MoonBoard 2024", "Tension Board 2 Spray"] as const;
 export type Board = (typeof BOARDS)[number];
 
 export const BOARD_SHORT_NAMES: Record<Board, string> = {
   "MoonBoard 2019": "MB 2019",
   "MoonBoard 2024": "MB 2024",
+  "Tension Board 2 Spray": "TB2 Spray",
 };
 
-export const GRADES = ["6a+/V3", "6b/V4", "6c/V5", "7a/V6", "7a+/V7"] as const;
+export const GRADES = [
+  "6a+/V3",
+  "6b/V4",
+  "6b+/V4",
+  "6c/V5",
+  "6c+/V5",
+  "7a/V6",
+  "7a+/V7",
+] as const;
 export type Grade = (typeof GRADES)[number];
 
-export const LOCATIONS = ["Planet Rock Ann Arbor", "Movement Long Island City"] as const;
+export const LOCATIONS = [
+  "Planet Rock Ann Arbor",
+  "Movement Long Island City",
+  "Movement Mountain View",
+  "Movement Sunnyvale",
+  "Movement Santa Clara",
+  "Movement San Francisco",
+  "Dogpatch Boulders",
+  "Hyperion Climbing",
+] as const;
 export type Location = (typeof LOCATIONS)[number];
 
 export const LOCATION_SHORT_NAMES: Record<Location, string> = {
   "Planet Rock Ann Arbor": "Planet Rock AA",
   "Movement Long Island City": "Movement LIC",
+  "Movement Mountain View": "Movement MV",
+  "Movement Sunnyvale": "Movement Sunnyvale",
+  "Movement Santa Clara": "Movement SC",
+  "Movement San Francisco": "Movement SF",
+  "Dogpatch Boulders": "Dogpatch",
+  "Hyperion Climbing": "Hyperion",
 };
 
 export interface Session {

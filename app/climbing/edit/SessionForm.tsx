@@ -92,7 +92,7 @@ export function SessionForm({ climbs = [], fixedClimb, editSession, onCancel, on
   const [date, setDate] = useState(() =>
     editSession ? toDateInputValue(new Date(editSession.timestamp * 1000)) : toDateInputValue(new Date())
   );
-  const [attempts, setAttempts] = useState(editSession?.attempts ?? 1);
+  const [attempts, setAttempts] = useState<number | "">(editSession?.attempts ?? 1);
   const [incline, setIncline] = useState(editSession?.incline ?? 40);
   const [sent, setSent] = useState(editSession?.sent ?? false);
   const [location, setLocation] = useState<Location | "">(editSession?.location ?? "");
@@ -137,7 +137,11 @@ export function SessionForm({ climbs = [], fixedClimb, editSession, onCancel, on
   }
 
   const canSubmit =
-    (editSession != null || trimmedName.length > 0) && location !== "" && !submitting && !notesTooLong;
+    (editSession != null || trimmedName.length > 0) &&
+    location !== "" &&
+    attempts !== "" &&
+    !submitting &&
+    !notesTooLong;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -293,6 +297,10 @@ export function SessionForm({ climbs = [], fixedClimb, editSession, onCancel, on
               max={999}
               value={attempts}
               onChange={(e) => {
+                if (e.target.value === "") {
+                  setAttempts("");
+                  return;
+                }
                 const value = Number(e.target.value);
                 if (Number.isInteger(value)) {
                   setAttempts(Math.min(999, Math.max(1, value)));

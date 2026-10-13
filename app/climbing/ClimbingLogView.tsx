@@ -5,6 +5,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ChevronDown, StickyNote } from "lucide-react";
+import { GRADES, LOCATION_SHORT_NAMES as LIB_LOCATION_SHORT_NAMES } from "@/lib/climbingLog/climbingLog";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -46,17 +47,14 @@ interface SessionRow {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const GRADES = ["6a+/V3", "6b/V4", "6c/V5", "7a/V6", "7a+/V7"];
-
-const LOCATION_SHORT_NAMES: Record<string, string> = {
-  "Planet Rock Ann Arbor": "Planet Rock AA",
-  "Movement Long Island City": "Movement LIC",
-};
+const LOCATION_SHORT_NAMES: Record<string, string> = LIB_LOCATION_SHORT_NAMES;
 
 const GRADE_COLORS: Record<string, string> = {
   "6a+/V3": "text-green-700  bg-green-50",
   "6b/V4":  "text-blue-700   bg-blue-50",
+  "6b+/V4": "text-blue-700   bg-blue-50",
   "6c/V5":  "text-orange-700 bg-orange-50",
+  "6c+/V5": "text-orange-700 bg-orange-50",
   "7a/V6":  "text-red-700    bg-red-50",
   "7a+/V7": "text-purple-700 bg-purple-50",
 };
@@ -64,7 +62,9 @@ const GRADE_COLORS: Record<string, string> = {
 const GRADE_COLORS_DARK: Record<string, string> = {
   "6a+/V3": "dark:text-green-400  dark:bg-green-950",
   "6b/V4":  "dark:text-blue-400   dark:bg-blue-950",
+  "6b+/V4": "dark:text-blue-400   dark:bg-blue-950",
   "6c/V5":  "dark:text-orange-400 dark:bg-orange-950",
+  "6c+/V5": "dark:text-orange-400 dark:bg-orange-950",
   "7a/V6":  "dark:text-red-400    dark:bg-red-950",
   "7a+/V7": "dark:text-purple-400 dark:bg-purple-950",
 };
