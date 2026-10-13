@@ -118,7 +118,7 @@ export function ClimbDetail({
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-4 border-b border-[#0a0a0a] pb-5">
         <Link href="/climbing/edit" className="text-sm text-[#737373] hover:text-[#0a0a0a]">
-          ← Editor
+          Editor
         </Link>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="flex min-w-0 flex-col gap-2.5">
