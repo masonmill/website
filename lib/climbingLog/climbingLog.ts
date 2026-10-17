@@ -10,6 +10,11 @@ export const BOARD_SHORT_NAMES: Record<Board, string> = {
 };
 
 export const GRADES = [
+  "4c/V0",
+  "5a/V1",
+  "5b/V1",
+  "5c/V2",
+  "6a/V3",
   "6a+/V3",
   "6b/V4",
   "6b+/V4",
