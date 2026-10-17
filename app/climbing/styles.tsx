@@ -3,18 +3,18 @@ import type { SendLabel } from "@/lib/climbingLog/climbingLog";
 // Visual vocabulary shared by the public /climbing page and the editor.
 
 export const GRADE_COLORS: Record<string, string> = {
-  "4c/V0": "#64748b",
-  "5a/V1": "#0e7490",
-  "5b/V1": "#0e7490",
-  "5c/V2": "#0d9488",
-  "6a/V3": "#15803d",
-  "6a+/V3": "#15803d",
-  "6b/V4": "#1d4ed8",
-  "6b+/V4": "#1d4ed8",
-  "6c/V5": "#c2410c",
-  "6c+/V5": "#c2410c",
-  "7a/V6": "#b91c1c",
-  "7a+/V7": "#7e22ce",
+  "4c/V0": "#16a34a",
+  "5a/V1": "#0d9488",
+  "5b/V1": "#0891b2",
+  "5c/V2": "#0284c7",
+  "6a/V3": "#2563eb",
+  "6a+/V3": "#4f46e5",
+  "6b/V4": "#7c3aed",
+  "6b+/V4": "#9333ea",
+  "6c/V5": "#c026d3",
+  "6c+/V5": "#db2777",
+  "7a/V6": "#e11d48",
+  "7a+/V7": "#dc2626",
 };
 
 export const LABEL_STYLES: Record<SendLabel, { color: string; bg: string; border: string }> = {

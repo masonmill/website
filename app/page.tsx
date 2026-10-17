@@ -9,9 +9,6 @@ export default function Home() {
         <section className="flex flex-col gap-10 md:flex-row md:items-center md:gap-14">
           <div className="reveal flex min-w-0 flex-col gap-7 md:flex-[1_1_440px]">
             <div className="flex flex-col gap-3.5">
-              <span className="mono text-[13px] tracking-[0.02em] text-[#737373]">
-                Software Engineer · Apple
-              </span>
               <h1 className="m-0 text-[clamp(44px,11vw,64px)] leading-none font-semibold tracking-[-0.04em]">
                 Mason Miller
               </h1>
