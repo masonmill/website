@@ -13,7 +13,7 @@ import {
   type Climb,
   type Session,
 } from "@/lib/climbingLog/climbingLog";
-import { BoardLogo, GradeTag, InclineTag, SendLabelPill } from "../../../styles";
+import { BoardLogo, GradeTag, GymLogo, InclineTag, SendLabelPill } from "../../../styles";
 import { SessionForm, type SessionFormClimbOption } from "../../SessionForm";
 import { EditSessionForm } from "../../EditSessionForm";
 import { ClimbForm } from "../../ClimbForm";
@@ -187,7 +187,8 @@ export function ClimbDetail({
                       <InclineTag incline={row.incline} />
                       <span>{formatAttempts(row.attempts)}</span>
                       {session && (
-                        <span className="mono text-xs">
+                        <span className="mono flex items-center gap-1.5 text-xs">
+                          <GymLogo location={session.location} />
                           {LOCATION_SHORT_NAMES[session.location] ?? session.location}
                         </span>
                       )}

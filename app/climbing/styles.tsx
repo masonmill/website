@@ -41,6 +41,21 @@ export function BoardLogo({ board, inverted = false }: { board: string; inverted
   );
 }
 
+// Gym marks shown beside location names, keyed by full location name.
+const GYM_LOGOS: Record<string, string> = {
+  "Planet Rock Ann Arbor": "/gyms/planet-rock.png",
+  "Movement Long Island City": "/gyms/movement.png",
+};
+
+export function GymLogo({ location }: { location: string }) {
+  const src = GYM_LOGOS[location];
+  if (!src) return null;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- tiny static icon; next/image adds nothing here
+    <img src={src} alt="" width={14} height={14} className="size-3.5 shrink-0 object-contain" />
+  );
+}
+
 export function GradeTag({ grade }: { grade: string }) {
   const color = GRADE_COLORS[grade] ?? "#525252";
   // Fixed width (longest grade is 6 chars) keeps whatever follows aligned across rows.

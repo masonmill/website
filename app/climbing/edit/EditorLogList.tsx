@@ -11,7 +11,7 @@ import {
   type EditorSessionRow,
 } from "@/lib/climbingLog/editorList";
 import { LOCATION_SHORT_NAMES, type Log } from "@/lib/climbingLog/climbingLog";
-import { BoardTag, GradeTag, InclineTag, SendLabelPill } from "../styles";
+import { BoardTag, GradeTag, GymLogo, InclineTag, SendLabelPill } from "../styles";
 import { SessionForm } from "./SessionForm";
 import { deleteSessionAction } from "./actions";
 import { Dialog, ErrorText, dangerButton, iconButton, primaryButton, secondaryButton } from "./ui";
@@ -220,7 +220,8 @@ export function EditorLogList({ log }: { log: Log }) {
                   <div className="flex flex-[0_0_120px] flex-col gap-[3px] pt-3">
                     <span className="text-[15px] font-semibold tracking-[-0.01em]">{formatDayLabel(first.timestamp)}</span>
                     {location && (
-                      <span className="mono text-xs whitespace-nowrap text-[#737373]">
+                      <span className="mono flex items-center gap-1.5 text-xs whitespace-nowrap text-[#737373]">
+                        <GymLogo location={location} />
                         {LOCATION_SHORT_NAMES[location] ?? location}
                       </span>
                     )}

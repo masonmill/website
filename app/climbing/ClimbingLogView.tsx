@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import SiteChrome from "../SiteChrome";
-import { BoardLogo, BoardTag, GRADE_COLORS, GradeTag, InclineTag, LABEL_STYLES, SendLabelPill } from "./styles";
+import { BoardLogo, BoardTag, GRADE_COLORS, GradeTag, GymLogo, InclineTag, LABEL_STYLES, SendLabelPill } from "./styles";
 import {
   BOARDS,
   BOARD_SHORT_NAMES,
@@ -590,7 +590,8 @@ export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null 
                 <div className="flex flex-wrap gap-x-8 gap-y-2 border-b border-[#f0f0f0] py-6">
                   <div className="flex flex-[0_0_150px] flex-col gap-1 pt-3">
                     <span className="text-[15px] font-semibold tracking-[-0.01em]">{shortDate(rs[0].session.timestamp)}</span>
-                    <span className="mono text-xs whitespace-nowrap text-[#737373]">
+                    <span className="mono flex items-center gap-1.5 text-xs whitespace-nowrap text-[#737373]">
+                      <GymLogo location={rs[0].session.location} />
                       {locationShort(rs[0].session.location)}
                     </span>
                   </div>
