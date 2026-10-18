@@ -51,12 +51,12 @@ const GYM_LOGOS: Record<string, string> = {
   "Movement Santa Clara": "/gyms/movement.png",
 };
 
-export function GymLogo({ location }: { location: string }) {
+export function GymLogo({ location, className = "" }: { location: string; className?: string }) {
   const src = GYM_LOGOS[location];
   if (!src) return null;
   return (
     // eslint-disable-next-line @next/next/no-img-element -- tiny static icon; next/image adds nothing here
-    <img src={src} alt="" width={14} height={14} className="mt-px size-3.5 shrink-0 object-contain" />
+    <img src={src} alt="" width={14} height={14} className={`size-3.5 shrink-0 object-contain ${className}`} />
   );
 }
 

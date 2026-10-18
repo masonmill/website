@@ -221,7 +221,7 @@ export function EditorLogList({ log }: { log: Log }) {
                     <span className="text-[15px] font-semibold tracking-[-0.01em]">{formatDayLabel(first.timestamp)}</span>
                     {location && (
                       <span className="mono flex items-start gap-1.5 text-xs text-[#737373]">
-                        <GymLogo location={location} />
+                        <GymLogo location={location} className="mt-px" />
                         {location}
                       </span>
                     )}

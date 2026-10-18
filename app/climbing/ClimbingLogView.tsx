@@ -306,6 +306,7 @@ interface FilterOption {
   label: string;
   dot?: string;
   board?: string;
+  gym?: string;
 }
 
 function FilterGroup({
@@ -336,6 +337,7 @@ function FilterGroup({
           >
             {o.dot && <span className="size-1.5 rounded-full" style={{ background: o.dot }} />}
             {o.board && <BoardLogo board={o.board} inverted={active} />}
+            {o.gym && <GymLogo location={o.gym} />}
             {o.label}
           </button>
         );
@@ -570,7 +572,7 @@ export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null 
                     label="Gym"
                     selected={gym}
                     onSelect={withReset(setGym)}
-                    options={[{ value: "all", label: "All" }, ...gymsIn.map((l) => ({ value: l, label: locationShort(l) }))]}
+                    options={[{ value: "all", label: "All" }, ...gymsIn.map((l) => ({ value: l, label: locationShort(l), gym: l }))]}
                   />
                 )}
               </div>
@@ -591,7 +593,7 @@ export default function ClimbingLogView({ climbs }: { climbs: LogClimb[] | null 
                   <div className="flex flex-[0_0_150px] flex-col gap-1 pt-3">
                     <span className="text-[15px] font-semibold tracking-[-0.01em]">{shortDate(rs[0].session.timestamp)}</span>
                     <span className="mono flex items-start gap-1.5 text-xs text-[#737373]">
-                      <GymLogo location={rs[0].session.location} />
+                      <GymLogo location={rs[0].session.location} className="mt-px" />
                       {rs[0].session.location}
                     </span>
                   </div>
