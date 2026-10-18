@@ -8,7 +8,6 @@ import { buildClimbDetailRows, computeSendsCount } from "@/lib/climbingLog/climb
 import { formatAttempts } from "@/lib/climbingLog/editorList";
 import {
   BOARD_SHORT_NAMES,
-  LOCATION_SHORT_NAMES,
   computeSessionLabel,
   type Climb,
   type Session,
@@ -189,7 +188,7 @@ export function ClimbDetail({
                       {session && (
                         <span className="mono flex items-center gap-1.5 text-xs">
                           <GymLogo location={session.location} />
-                          {LOCATION_SHORT_NAMES[session.location] ?? session.location}
+                          {session.location}
                         </span>
                       )}
                     </span>

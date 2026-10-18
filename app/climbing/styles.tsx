@@ -45,6 +45,10 @@ export function BoardLogo({ board, inverted = false }: { board: string; inverted
 const GYM_LOGOS: Record<string, string> = {
   "Planet Rock Ann Arbor": "/gyms/planet-rock.png",
   "Movement Long Island City": "/gyms/movement.png",
+  "Movement San Francisco": "/gyms/movement.png",
+  "Movement Mountain View": "/gyms/movement.png",
+  "Movement Sunnyvale": "/gyms/movement.png",
+  "Movement Santa Clara": "/gyms/movement.png",
 };
 
 export function GymLogo({ location }: { location: string }) {
@@ -52,7 +56,7 @@ export function GymLogo({ location }: { location: string }) {
   if (!src) return null;
   return (
     // eslint-disable-next-line @next/next/no-img-element -- tiny static icon; next/image adds nothing here
-    <img src={src} alt="" width={14} height={14} className="size-3.5 shrink-0 object-contain" />
+    <img src={src} alt="" width={14} height={14} className="mt-px size-3.5 shrink-0 object-contain" />
   );
 }
 
