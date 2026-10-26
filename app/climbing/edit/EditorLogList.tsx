@@ -10,7 +10,7 @@ import {
   type DayKeyFn,
   type EditorSessionRow,
 } from "@/lib/climbingLog/editorList";
-import { type Log } from "@/lib/climbingLog/climbingLog";
+import { climbIncline, latestSessionDefaults, type Log } from "@/lib/climbingLog/climbingLog";
 import { BoardTag, GradeTag, GymLogo, InclineTag, SendLabelPill } from "../styles";
 import { SessionForm } from "./SessionForm";
 import { deleteSessionAction } from "./actions";
@@ -108,9 +108,10 @@ export function EditorLogList({ log }: { log: Log }) {
   const [expandedNotesKey, setExpandedNotesKey] = useState<string | null>(null);
 
   const climbOptions = useMemo(
-    () => log.climbs.map((c) => ({ name: c.name, board: c.board, grade: c.grade })),
+    () => log.climbs.map((c) => ({ name: c.name, board: c.board, grade: c.grade, incline: climbIncline(c) })),
     [log]
   );
+  const sessionDefaults = useMemo(() => latestSessionDefaults(log), [log]);
 
   const findSession = (row: EditorSessionRow) =>
     log.climbs.find((c) => c.id === row.climbId)?.sessions.find((s) => s.id === row.sessionId);
@@ -158,6 +159,7 @@ export function EditorLogList({ log }: { log: Log }) {
   const form = isFormOpen && (
     <SessionForm
       climbs={climbOptions}
+      defaults={sessionDefaults}
       onCancel={() => setIsFormOpen(false)}
       onSuccess={handleFormSuccess}
     />

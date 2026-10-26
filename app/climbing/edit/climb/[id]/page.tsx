@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { climbIncline, latestSessionDefaults } from "@/lib/climbingLog/climbingLog";
 import { readLog } from "@/lib/climbingLog/githubStorage";
 import { ClimbDetail } from "./ClimbDetail";
 
@@ -51,7 +52,13 @@ export default async function ClimbDetailPage({
     <main className="mx-auto flex w-full max-w-[760px] flex-1 flex-col px-6 pt-14 pb-20">
       <ClimbDetail
         climb={climb}
-        allClimbs={result.value.log.climbs.map((c) => ({ name: c.name, board: c.board, grade: c.grade }))}
+        allClimbs={result.value.log.climbs.map((c) => ({
+          name: c.name,
+          board: c.board,
+          grade: c.grade,
+          incline: climbIncline(c),
+        }))}
+        sessionDefaults={latestSessionDefaults(result.value.log)}
         focusedSessionId={focusedSessionId}
       />
     </main>

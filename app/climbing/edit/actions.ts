@@ -51,7 +51,7 @@ export interface LogSessionActionInput {
 /**
  * Logs several climbs from one gym visit in a single commit. Used by the
  * "New Session" form, which collects climbs one by one before saving them
- * together. A climb matching an existing name and board gets a new session
+ * together. A climb matching an existing name, board and incline gets a new session
  * on that climb; otherwise the climb is created.
  */
 export async function logSessionsAction(

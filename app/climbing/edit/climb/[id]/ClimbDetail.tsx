@@ -8,9 +8,11 @@ import { buildClimbDetailRows, computeSendsCount } from "@/lib/climbingLog/climb
 import { formatAttempts } from "@/lib/climbingLog/editorList";
 import {
   BOARD_SHORT_NAMES,
+  climbIncline,
   computeSessionLabel,
   type Climb,
   type Session,
+  type SessionDefaults,
 } from "@/lib/climbingLog/climbingLog";
 import { BoardLogo, GradeTag, GymLogo, InclineTag, SendLabelPill } from "../../../styles";
 import { SessionForm, type SessionFormClimbOption } from "../../SessionForm";
@@ -31,11 +33,14 @@ function formatDayLabel(timestampSeconds: number): string {
 export function ClimbDetail({
   climb,
   allClimbs,
+  sessionDefaults,
   focusedSessionId,
 }: {
   climb: Climb;
   /** Every climb in the log, for name autocomplete when logging a session. */
   allClimbs: SessionFormClimbOption[];
+  /** Location for a new session, from the most recently logged one. */
+  sessionDefaults?: SessionDefaults;
   focusedSessionId?: number;
 }) {
   const router = useRouter();
@@ -243,7 +248,8 @@ export function ClimbDetail({
       {isFormOpen && (
         <SessionForm
           climbs={allClimbs}
-          initialClimb={{ name: climb.name, board: climb.board, grade: climb.grade }}
+          initialClimb={{ name: climb.name, board: climb.board, grade: climb.grade, incline: climbIncline(climb) }}
+          defaults={sessionDefaults}
           onCancel={() => setIsFormOpen(false)}
           onSuccess={handleFormSuccess}
         />

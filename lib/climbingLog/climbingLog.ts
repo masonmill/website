@@ -230,6 +230,54 @@ function findSessionIndex(climb: Climb, sessionId: number): number {
   return climb.sessions.findIndex((s) => s.id === sessionId);
 }
 
+/**
+ * A climb's incline (board angle). The same problem set at a different angle
+ * can carry a different grade, so a climb is identified by name + board +
+ * incline. Every session on a climb shares the incline; if older data mixes
+ * angles, the most recent session's incline wins.
+ */
+export function climbIncline(climb: Climb): number {
+  return climb.sessions[climb.sessions.length - 1].incline;
+}
+
+/** Finds the climb matching a name + board + incline exactly, if any. */
+export function findMatchingClimb<T extends Pick<Climb, "name" | "board"> & { incline: number }>(
+  climbs: T[],
+  identity: { name: string; board: string; incline: number },
+): T | undefined {
+  return climbs.find(
+    (c) => c.name === identity.name && c.board === identity.board && c.incline === identity.incline,
+  );
+}
+
+export interface SessionDefaults {
+  board: Board;
+  grade: Grade;
+  incline: number;
+  location: Location;
+}
+
+/**
+ * The board, grade, incline and location of the most recently logged
+ * session (latest timestamp), used to pre-fill the New session form.
+ * Undefined for an empty log.
+ */
+export function latestSessionDefaults(log: Log): SessionDefaults | undefined {
+  let latest: { climb: Climb; session: Session } | undefined;
+  for (const climb of log.climbs) {
+    for (const session of climb.sessions) {
+      if (!latest || session.timestamp > latest.session.timestamp) latest = { climb, session };
+    }
+  }
+  if (!latest) return undefined;
+  return {
+    board: latest.climb.board,
+    grade: latest.climb.grade,
+    incline: latest.session.incline,
+    location: latest.session.location,
+  };
+}
+
 // ─── Location consistency ───────────────────────────────────────────────
 //
 // A session's location represents one gym visit, and a visit can span
@@ -460,8 +508,8 @@ export interface OperationSuccess {
 
 /**
  * Logs a session under the given name/board/grade. If a climb with the
- * exact trimmed name and board already exists, the session is added to it
- * (its grade is left unchanged). Otherwise a new climb is created first.
+ * exact trimmed name, board and incline already exists, the session is added
+ * to it (its grade is left unchanged). Otherwise a new climb is created first.
  */
 export function logSession(
   log: Log,
@@ -484,7 +532,9 @@ export function logSession(
   const sessionInputResult = validateSessionInput(input);
   if (!sessionInputResult.ok) return sessionInputResult;
 
-  const existingClimb = log.climbs.find((c) => c.name === name && c.board === input.board);
+  const existingClimb = log.climbs.find(
+    (c) => c.name === name && c.board === input.board && climbIncline(c) === sessionInputResult.value.incline,
+  );
 
   let workingLog = log;
   let climbId: number;

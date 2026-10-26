@@ -8,9 +8,11 @@ import {
   GRADES,
   LOCATIONS,
   NOTES_MAX_CODE_POINTS,
+  findMatchingClimb,
   type Board,
   type Grade,
   type Location,
+  type SessionDefaults,
 } from "@/lib/climbingLog/climbingLog";
 import { computeBatchSessionTimestamps, toDateInputValue } from "@/lib/climbingLog/timestamp";
 import { BoardLogo, BoardTag, GRADE_COLORS, GradeTag, InclineTag } from "../styles";
@@ -31,11 +33,16 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
-/** Minimal climb identity used for name autocomplete and board/grade locking. */
+/**
+ * Minimal climb identity used for name autocomplete and grade locking. A
+ * climb is identified by name + board + incline, since the same problem at a
+ * different angle can have a different grade.
+ */
 export interface SessionFormClimbOption {
   name: string;
   board: Board;
   grade: Grade;
+  incline: number;
 }
 
 export interface SessionFormProps {
@@ -43,9 +50,11 @@ export interface SessionFormProps {
   climbs: SessionFormClimbOption[];
   /**
    * Pre-fills the first climb (opened from a climb's detail page). Logging
-   * by its exact name and board adds the session to that existing climb.
+   * by its exact name, board and incline adds the session to that existing climb.
    */
   initialClimb?: SessionFormClimbOption;
+  /** Board/grade/incline/location to start from, taken from the most recently logged session. */
+  defaults?: SessionDefaults;
   onCancel: () => void;
   /** Called after a successful save so the caller can refresh data and close the form. */
   onSuccess: () => void;
@@ -63,8 +72,10 @@ interface ClimbEntry {
   notes: string;
 }
 
-const DEFAULT_BOARD: Board = "MoonBoard 2019";
-const DEFAULT_GRADE: Grade = "6a+/V3";
+// Fallbacks for an empty log, when there is no previous session to copy.
+const FALLBACK_BOARD: Board = BOARDS[0];
+const FALLBACK_GRADE: Grade = GRADES[0];
+const FALLBACK_INCLINE = 40;
 
 const plural = (n: number, word: string) => `${n} ${word}${n !== 1 ? "s" : ""}`;
 
@@ -75,10 +86,10 @@ const plural = (n: number, word: string) => `${n} ${word}${n !== 1 ? "s" : ""}`;
  * climbs themselves, added one at a time. "Save session" writes them all in
  * a single commit.
  */
-export function SessionForm({ climbs, initialClimb, onCancel, onSuccess }: SessionFormProps) {
+export function SessionForm({ climbs, initialClimb, defaults, onCancel, onSuccess }: SessionFormProps) {
   // Shared by every climb in the session.
   const [date, setDate] = useState(() => toDateInputValue(new Date()));
-  const [location, setLocation] = useState<Location | "">("");
+  const [location, setLocation] = useState<Location | "">(defaults?.location ?? "");
 
   // Climbs added so far.
   const [entries, setEntries] = useState<ClimbEntry[]>([]);
@@ -86,11 +97,10 @@ export function SessionForm({ climbs, initialClimb, onCancel, onSuccess }: Sessi
 
   // The climb currently being entered.
   const [name, setName] = useState(initialClimb?.name ?? "");
-  const [board, setBoard] = useState<Board>(initialClimb?.board ?? DEFAULT_BOARD);
-  const [grade, setGrade] = useState<Grade>(initialClimb?.grade ?? DEFAULT_GRADE);
-  const [locked, setLocked] = useState(initialClimb != null);
+  const [board, setBoard] = useState<Board>(initialClimb?.board ?? defaults?.board ?? FALLBACK_BOARD);
+  const [chosenGrade, setGrade] = useState<Grade>(initialClimb?.grade ?? defaults?.grade ?? FALLBACK_GRADE);
   const [attempts, setAttempts] = useState<number | "">(1);
-  const [incline, setIncline] = useState(40);
+  const [incline, setIncline] = useState(initialClimb?.incline ?? defaults?.incline ?? FALLBACK_INCLINE);
   const [sent, setSent] = useState(false);
   const [notes, setNotes] = useState("");
   const nameInput = useRef<HTMLInputElement>(null);
@@ -103,41 +113,46 @@ export function SessionForm({ climbs, initialClimb, onCancel, onSuccess }: Sessi
   const trimmedName = name.trim();
 
   // Climbs created earlier in this session count as known, so logging one
-  // again locks it to the same board and grade.
+  // again locks it to the same grade.
   const knownClimbs = useMemo(() => {
-    const queued = entries.filter((e) => !climbs.some((c) => c.name === e.name && c.board === e.board));
-    return [...climbs, ...queued.map(({ name, board, grade }) => ({ name, board, grade }))];
+    const queued = entries.filter((e) => !findMatchingClimb(climbs, e));
+    return [...climbs, ...queued.map(({ name, board, grade, incline }) => ({ name, board, grade, incline }))];
   }, [climbs, entries]);
+
+  // An exact name + board + incline match is an existing climb: the session
+  // is added to it, so its grade is fixed. Changing the board or incline
+  // makes it a different climb with its own grade.
+  const match = trimmedName.length > 0 ? findMatchingClimb(knownClimbs, { name: trimmedName, board, incline }) : undefined;
+  const locked = match != null;
+  const grade = match?.grade ?? chosenGrade;
 
   const suggestions = useMemo(() => {
     if (trimmedName.length === 0) return [];
     const lower = trimmedName.toLowerCase();
-    return knownClimbs.filter((c) => c.name.toLowerCase().includes(lower));
-  }, [knownClimbs, trimmedName]);
+    const all = knownClimbs.filter((c) => c.name.toLowerCase().includes(lower));
+    // Once a climb is selected, only offer the same problem at other boards
+    // or angles.
+    return match ? all.filter((c) => c.name === match.name && c !== match) : all;
+  }, [knownClimbs, trimmedName, match]);
 
   function handleNameChange(value: string) {
     const trimmed = value.trim();
-    if (trimmed.length === 0) {
-      setName(value);
-      setLocked(false);
-      return;
-    }
-    // A trimmed, case-sensitive exact name match auto-selects and locks
-    // that climb's board/grade (mirrors the iOS app's updateSuggestions).
-    const exact = knownClimbs.find((c) => c.name === trimmed);
-    if (exact) {
-      selectSuggestion(exact);
+    // A trimmed, case-sensitive exact name match selects that climb's board
+    // and incline, unless a climb by that name already matches the current
+    // board and incline (the same problem can exist at several angles).
+    const exactMatches = knownClimbs.filter((c) => c.name === trimmed);
+    if (exactMatches.length > 0 && !findMatchingClimb(exactMatches, { name: trimmed, board, incline })) {
+      selectSuggestion(exactMatches[0]);
       return;
     }
     setName(value);
-    setLocked(false);
   }
 
   function selectSuggestion(climb: SessionFormClimbOption) {
     setName(climb.name);
     setBoard(climb.board);
+    setIncline(climb.incline);
     setGrade(climb.grade);
-    setLocked(true);
   }
 
   const currentIsValid = trimmedName.length > 0 && attempts !== "" && !notesTooLong;
@@ -166,7 +181,6 @@ export function SessionForm({ climbs, initialClimb, onCancel, onSuccess }: Sessi
     setEntries((prev) => [...prev, currentEntry()]);
     // Board, grade and incline usually carry over between climbs on one wall.
     setName("");
-    setLocked(false);
     setAttempts(1);
     setSent(false);
     setNotes("");
@@ -209,7 +223,6 @@ export function SessionForm({ climbs, initialClimb, onCancel, onSuccess }: Sessi
         // rather than losing it, so a retry includes it.
         setEntries(all);
         setName("");
-        setLocked(false);
         setNotes("");
       }
       setError(isNotFound(result) ? "The log changed while you were editing. Close and reopen to retry." : errorMessage(result));
@@ -306,10 +319,10 @@ export function SessionForm({ climbs, initialClimb, onCancel, onSuccess }: Sessi
             />
           </label>
 
-          {!locked && trimmedName.length > 0 && suggestions.length > 0 && (
+          {trimmedName.length > 0 && suggestions.length > 0 && (
             <ul className="-mt-1.5 flex flex-col divide-y divide-[#f0f0f0] overflow-hidden rounded-[10px] border border-[#e5e5e5]">
               {suggestions.map((climb, i) => (
-                <li key={`${climb.name}-${climb.board}-${i}`}>
+                <li key={`${climb.name}-${climb.board}-${climb.incline}-${i}`}>
                   <button
                     type="button"
                     onClick={() => selectSuggestion(climb)}
@@ -319,6 +332,7 @@ export function SessionForm({ climbs, initialClimb, onCancel, onSuccess }: Sessi
                     <span className="flex shrink-0 items-center gap-2.5 text-[13px] text-[#737373]">
                       <GradeTag grade={climb.grade} />
                       <BoardTag board={climb.board} short={BOARD_SHORT_NAMES[climb.board]} />
+                      <InclineTag incline={climb.incline} />
                     </span>
                   </button>
                 </li>
@@ -330,7 +344,7 @@ export function SessionForm({ climbs, initialClimb, onCancel, onSuccess }: Sessi
             <FieldLabel>Board</FieldLabel>
             <div className="flex flex-wrap gap-1.5">
               {BOARDS.map((b) => (
-                <Chip key={b} active={board === b} disabled={locked} onClick={() => setBoard(b)}>
+                <Chip key={b} active={board === b} onClick={() => setBoard(b)}>
                   <BoardLogo board={b} inverted={board === b} />
                   {BOARD_SHORT_NAMES[b]}
                 </Chip>

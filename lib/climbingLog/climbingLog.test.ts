@@ -13,6 +13,8 @@ import {
   editClimb,
   computeSessionLabel,
   compareByCodePoint,
+  climbIncline,
+  latestSessionDefaults,
   type Log,
 } from "./climbingLog";
 
@@ -115,7 +117,7 @@ test("logging a session under a new name creates a new climb", () => {
   assert.equal(result.value.commitMessage, "Log session: Brand New Problem");
 });
 
-test("logging under an existing exact name+board adds a session and keeps grade", () => {
+test("logging under an existing exact name+board+incline adds a session and keeps grade", () => {
   const log = mustParse(fixtureText);
   const existing = log.climbs.find((c) => c.name === "Entry")!;
   const result = logSession(log, {
@@ -124,7 +126,7 @@ test("logging under an existing exact name+board adds a session and keeps grade"
     grade: "7a+/V7", // should be ignored since climb exists
     timestamp: 999999,
     attempts: 3,
-    incline: 25,
+    incline: 40,
     sent: false,
     location: "Planet Rock Ann Arbor",
   });
@@ -134,6 +136,50 @@ test("logging under an existing exact name+board adds a session and keeps grade"
   const climb = result.value.log.climbs.find((c) => c.id === existing.id)!;
   assert.equal(climb.grade, existing.grade);
   assert.equal(climb.sessions.length, existing.sessions.length + 1);
+});
+
+test("logging at a different incline creates a separate climb", () => {
+  const log = mustParse(fixtureText);
+  const existing = log.climbs.find((c) => c.name === "Entry")!;
+  const result = logSession(log, {
+    name: "Entry",
+    board: existing.board,
+    grade: "7a+/V7",
+    timestamp: 999999,
+    attempts: 1,
+    incline: climbIncline(existing) + 5,
+    sent: false,
+    location: "Planet Rock Ann Arbor",
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.value.log.climbs.length, log.climbs.length + 1);
+  const created = result.value.log.climbs.find((c) => c.id === result.value.climbId)!;
+  assert.equal(created.grade, "7a+/V7");
+  assert.equal(result.value.log.climbs.find((c) => c.id === existing.id)!.sessions.length, existing.sessions.length);
+});
+
+test("latestSessionDefaults uses the most recent session's board, grade, incline and location", () => {
+  const log = mustParse(fixtureText);
+  const result = logSession(log, {
+    name: "Newest",
+    board: "Tension Board 2 Spray",
+    grade: "5c/V2",
+    timestamp: 9_999_999_999,
+    attempts: 1,
+    incline: 30,
+    sent: false,
+    location: "Hyperion Climbing",
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.deepEqual(latestSessionDefaults(result.value.log), {
+    board: "Tension Board 2 Spray",
+    grade: "5c/V2",
+    incline: 30,
+    location: "Hyperion Climbing",
+  });
+  assert.equal(latestSessionDefaults({ nextClimbID: 0, climbs: [] }), undefined);
 });
 
 test("logging with a different board creates a separate climb", () => {
