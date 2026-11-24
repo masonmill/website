@@ -6,9 +6,10 @@ import { usePathname } from "next/navigation";
 const NAV_ITEMS = [
   { href: "/", label: "About" },
   { href: "/climbing", label: "Climbing" },
+  { href: "/cv", label: "CV" },
 ];
 
-/** Shared header and footer for the public pages (home and /climbing). */
+/** Shared header and footer for the public pages (home, /climbing, and /cv). */
 export default function SiteChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
@@ -35,14 +36,6 @@ export default function SiteChrome({ children }: { children: React.ReactNode }) 
                 </Link>
               );
             })}
-            <a
-              href="/resume.pdf"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-3 py-2 font-medium text-[#737373] hover:text-[#0a0a0a]"
-            >
-              Resume
-            </a>
           </div>
         </nav>
       </header>
